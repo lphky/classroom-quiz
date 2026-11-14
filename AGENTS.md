@@ -6,4 +6,4 @@
 - `?test` 開放 `window.__cq`（state、setRng）。改動後執行 `npm test`（node 單元測試 + Playwright 三種尺寸）。
 - 測試伺服器用 `scripts/serve.mjs`（python http.server 在此環境會卡死）。
 
-- 現行視覺：霧白／墨黑／電光紫；700px 以下使用底部導航。css/style.css 為完整樣式，勿恢復舊綠色主題。tests/layout.spec.js 驗證三尺寸布局與截圖。
+- 現行視覺：深墨藍／亮青檸 Classroom Playbook；700px 以下底部導航，電腦支援專注投影。css/style.css 為完整樣式；卡牌及導航 SVG 在 app.mjs。課堂搜尋／狀態篩選只改顯示，不影響抽人名單；即時數據與 COMBO 不改計分。tests/playbook.spec.js 驗證新增流程；tests/layout.spec.js 驗證三尺寸布局與截圖。test-data/demo-backup.json 為虛構測試備份。

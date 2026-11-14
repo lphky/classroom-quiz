@@ -1,0 +1,411 @@
+{
+  "version": 1,
+  "settings": {
+    "score": {
+      "volunteer": 2,
+      "drawn": 1,
+      "designated": 1,
+      "standing": 1
+    },
+    "itemOdds": {
+      "exempt": 40,
+      "designate": 30,
+      "down": 15,
+      "up": 15
+    },
+    "baseWeight": 100,
+    "weightStep": 20,
+    "minWeight": 40,
+    "maxWeight": 200,
+    "bagCap": 5,
+    "antiRepeat": true,
+    "antiRepeatCount": 3,
+    "showOdds": true,
+    "animation": true
+  },
+  "classes": [
+    {
+      "id": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "name": "星際探索班 · 測試",
+      "students": [
+        {
+          "id": "bd1e4f5b-d761-400e-8faf-88013f1dfada",
+          "no": "1",
+          "name": "陳星晴",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 0
+        },
+        {
+          "id": "e7a862d2-154c-4fc1-8d51-ce042a69938f",
+          "no": "2",
+          "name": "李浩然",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 1
+        },
+        {
+          "id": "eee82554-1bad-4d05-af85-d8189ad42bbc",
+          "no": "3",
+          "name": "張樂彤",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 2
+        },
+        {
+          "id": "62d85b2c-451e-4fe0-9039-0ee8775d86cc",
+          "no": "4",
+          "name": "黃子軒",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 3
+        },
+        {
+          "id": "525167ba-f4d6-4b0d-b440-4166a8ca1fe4",
+          "no": "5",
+          "name": "林曉嵐",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 0
+        },
+        {
+          "id": "df252eac-e987-4cfb-931e-da44b26cf63d",
+          "no": "6",
+          "name": "何宇澄",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 1
+        },
+        {
+          "id": "acb9b85b-091e-4cdf-b73d-357e74d65cee",
+          "no": "7",
+          "name": "周芷晴",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 2
+        },
+        {
+          "id": "225103db-5f90-49d6-931c-25d4b95ddbc6",
+          "no": "8",
+          "name": "吳朗希",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 3
+        },
+        {
+          "id": "3e42d656-a67e-4ed5-b4af-08ec8acaf30c",
+          "no": "9",
+          "name": "梁悅心",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 0
+        },
+        {
+          "id": "c5b34dbe-e4f0-4198-9274-d7308a62ee6b",
+          "no": "10",
+          "name": "鄭天佑",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 1
+        },
+        {
+          "id": "7c8ff9a2-fcda-4c4a-aa3c-80e363a0369b",
+          "no": "11",
+          "name": "謝嘉怡",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 2
+        },
+        {
+          "id": "910eb705-ae9b-4148-bb8f-ebafc26a07b0",
+          "no": "12",
+          "name": "許柏謙",
+          "weight": 100,
+          "items": {
+            "exempt": 1,
+            "designate": 1,
+            "down": 1,
+            "up": 1
+          },
+          "score": 3
+        }
+      ]
+    }
+  ],
+  "activeClassId": "89235b7c-f792-4836-9def-0a0b8706940b",
+  "session": null,
+  "sessions": [],
+  "logs": [
+    {
+      "id": "7815ebda-3826-490a-b178-8fe413fe46c4",
+      "at": "2026-11-14T14:58:03.161Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "陳星晴",
+      "type": "adjust",
+      "studentId": "bd1e4f5b-d761-400e-8faf-88013f1dfada",
+      "changes": {
+        "score": 0,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "16c80c0c-9708-44f9-b30e-d7711c549d33",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "李浩然",
+      "type": "adjust",
+      "studentId": "e7a862d2-154c-4fc1-8d51-ce042a69938f",
+      "changes": {
+        "score": 1,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "84e23152-577e-4461-845e-2629a1a7470d",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "張樂彤",
+      "type": "adjust",
+      "studentId": "eee82554-1bad-4d05-af85-d8189ad42bbc",
+      "changes": {
+        "score": 2,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "712d6795-8d20-462b-9e09-569aed0d6c01",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "黃子軒",
+      "type": "adjust",
+      "studentId": "62d85b2c-451e-4fe0-9039-0ee8775d86cc",
+      "changes": {
+        "score": 3,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "3777a068-0b57-4e5c-95d6-101269cc4af4",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "林曉嵐",
+      "type": "adjust",
+      "studentId": "525167ba-f4d6-4b0d-b440-4166a8ca1fe4",
+      "changes": {
+        "score": 0,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "d75f8c52-4eb4-40fa-917b-ce08329de7ad",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "何宇澄",
+      "type": "adjust",
+      "studentId": "df252eac-e987-4cfb-931e-da44b26cf63d",
+      "changes": {
+        "score": 1,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "c4fc4756-f019-4041-99de-0417fbee622b",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "周芷晴",
+      "type": "adjust",
+      "studentId": "acb9b85b-091e-4cdf-b73d-357e74d65cee",
+      "changes": {
+        "score": 2,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "cfd635c8-60a0-457f-a150-2607286072be",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "吳朗希",
+      "type": "adjust",
+      "studentId": "225103db-5f90-49d6-931c-25d4b95ddbc6",
+      "changes": {
+        "score": 3,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "954e5a45-dcba-45d0-892d-a4e768e254ca",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "梁悅心",
+      "type": "adjust",
+      "studentId": "3e42d656-a67e-4ed5-b4af-08ec8acaf30c",
+      "changes": {
+        "score": 0,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "76dc1db2-a480-4caf-bf57-23ebfb8575ba",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "鄭天佑",
+      "type": "adjust",
+      "studentId": "c5b34dbe-e4f0-4198-9274-d7308a62ee6b",
+      "changes": {
+        "score": 1,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "0cd77d69-4d7d-4bc5-b375-a19958a41893",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "謝嘉怡",
+      "type": "adjust",
+      "studentId": "7c8ff9a2-fcda-4c4a-aa3c-80e363a0369b",
+      "changes": {
+        "score": 2,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    },
+    {
+      "id": "e15a45e7-416e-4a85-8051-e8b473a471fd",
+      "at": "2026-11-14T14:58:03.162Z",
+      "classId": "89235b7c-f792-4836-9def-0a0b8706940b",
+      "sessionId": null,
+      "name": "許柏謙",
+      "type": "adjust",
+      "studentId": "910eb705-ae9b-4148-bb8f-ebafc26a07b0",
+      "changes": {
+        "score": 3,
+        "items": {
+          "exempt": 1,
+          "designate": 1,
+          "down": 1,
+          "up": 1
+        }
+      }
+    }
+  ]
+}
