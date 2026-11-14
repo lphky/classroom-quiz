@@ -1,4 +1,5 @@
 import * as L from './logic.mjs';
+import { addDemo } from './demo.mjs';
 import { load, loadUndo, save, UNDO_MAX } from './store.mjs';
 
 const { ITEMS, ITEM_KEYS } = L;
@@ -61,6 +62,7 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
 const TABS = [
   ['class', '課堂'],
+  ['cards', '道具圖鑑'],
   ['students', '學生'],
   ['report', '報表'],
   ['settings', '設定'],
@@ -83,14 +85,18 @@ function render() {
   renderHeader();
   const app = $('#app');
   if (ui.tab === 'class') app.innerHTML = viewClass();
+  else if (ui.tab === 'cards') app.innerHTML = viewCards();
   else if (ui.tab === 'students') app.innerHTML = viewStudents();
   else if (ui.tab === 'report') app.innerHTML = viewReport();
   else app.innerHTML = viewSettings();
   renderModal();
 }
 
+function viewCards() {
+  return `<section class="hero"><span class="eyebrow">THE INVENTORY</span><h1>每張卡，都有出場時機。</h1><p>主動舉手答對即可抽卡。站立同學答對可坐低，不抽卡。</p></section><div class="inventory">${ITEM_KEYS.map((k,i)=>`<article class="collectible tone-${i}"><span class="eyebrow">NO. 0${i+1} / SKILL CARD</span><div class="card-symbol">${ITEMS[k].icon}</div><h2>${esc(ITEMS[k].name)}</h2><p>${esc(ITEMS[k].desc)}</p><footer>${i<2?'被抽中時使用':'點學生 → 背包使用'}${k==='up'?' · 老師批准':''}</footer></article>`).join('')}</div><section class="card"><h3>公平遊戲約定</h3><p>指定不能連鎖轉嫁；權重有上下限；老師可以否決調高卡。背包容量及抽卡比例可在設定調整。</p></section>`;
+}
 function viewNewClass(intro = true) {
-  return `<section class="card narrow">
+  return `${intro ? '<section class="hero"><span class="eyebrow">CLASSROOM QUEST / 教師控制台</span><h1>讓每一次舉手，<br>成為新的冒險。</h1><p>抽問、收集道具、一起達成全班挑戰。</p><button class="btn primary big" data-act="demo">一鍵體驗 · 12 人測試班</button></section>' : ''}<section class="card narrow">
     ${intro ? '<h2>開始：建立第一班</h2><p class="muted">貼上學生名單，每行一位。可以寫「座號 姓名」，例如「1 陳大文」。</p>' : '<h2>新增班別</h2>'}
     <form data-form="newClass" class="stack">
       <label>班名<input name="name" required placeholder="例如：3A 中文"></label>
@@ -126,7 +132,10 @@ function viewLive(c) {
   const chance = Object.fromEntries(cands.map((x) => [x.id, x.chance]));
   const standingCount = c.students.filter((s) => ses.standing[s.id]).length;
   const recentLogs = state.logs.filter((e) => e.sessionId === ses.id && !['start', 'adjust'].includes(e.type)).slice(-8).reverse();
-  return `<section class="actions">
+  const answers = state.logs.filter(e=>e.sessionId===ses.id && e.type==='answer');
+  const wins = answers.filter(e=>e.correct).length;
+  const goal = 10;
+  return `<section class="hero live-hero"><div><span class="eyebrow">LIVE CLASSROOM / ${esc(c.name)}</span><h1>${wins>=goal?'全班挑戰達成！ ✨':'一起點亮知識星球。'}</h1><p>合作任務：全班累積答對 10 題，不額外改動個人成績。</p><div class="mission"><progress max="10" value="${Math.min(10,wins)}"></progress><b>${wins} / 10</b></div></div><div class="clock-panel"><span class="eyebrow">思考倒數</span><strong id="questClock">${clockLeft}</strong><div class="row"><button class="btn ghost" data-act="timer">${clockRunning?'暫停':'開始'}倒數</button><button class="btn ghost" data-act="resetTimer">重設 30 秒</button></div></div></section><section class="actions">
       <button class="btn hand big" data-act="volunteer">✋ 有人舉手</button>
       <button class="btn draw big" data-act="draw">🎲 冇人舉手，抽人</button>
     </section>
@@ -215,7 +224,7 @@ function viewSettings() {
       <label class="check"><input type="checkbox" name="showOdds" ${s.showOdds ? 'checked' : ''}> 課堂畫面顯示抽中機率</label>
       <label class="check"><input type="checkbox" name="animation" ${s.animation ? 'checked' : ''}> 抽人及抽卡動畫</label></div>
     <div class="row end"><button class="btn primary">儲存設定</button></div></form>
-    <section class="card stack"><h2>資料備份</h2>
+    <section class="card stack"><h2>資料備份與試玩</h2><button type="button" class="btn" data-act="demo">新增 12 人測試班（保留現有班別）</button>
       <p class="muted">資料只儲存喺呢部機嘅瀏覽器。換機或清瀏覽器資料前，請先下載備份。</p>
       <div class="row gap wrap"><button class="btn" data-act="backup">下載備份</button>
       <label class="btn ghost file">還原備份<input type="file" accept="application/json,.json" data-act="restore" hidden></label>
@@ -380,7 +389,20 @@ function downloadFile(name, text, type) {
 
 const today = () => new Date().toLocaleDateString('sv-SE');
 
+let clockLeft = 30;
+let clockRunning = false;
+setInterval(() => {
+  if (!clockRunning) return;
+  clockLeft = Math.max(0, clockLeft-1);
+  const el = $('#questClock');
+  if (el) el.textContent = clockLeft || '時間到';
+  if (!clockLeft) { clockRunning=false; toast('思考時間到，老師可以邀請同學作答'); }
+}, 1000);
 const actions = {
+  timer: () => { if (!clockLeft) clockLeft=30; clockRunning=!clockRunning; render(); },
+  resetTimer: () => { clockLeft=30; clockRunning=false; render(); },
+  demo: () => { if (attempt(addDemo, '建立測試班')) { ui.tab='class'; render(); toast('12 位虛構學生已加入，每人有四種道具各一張'); } },
+  fullscreen: async () => { try { if(document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); } catch { toast('此瀏覽器未能開啟全螢幕'); } },
   tab: (el) => {
     ui.tab = el.dataset.v;
     ui.modal = null;
@@ -398,6 +420,7 @@ const actions = {
     if (attempt((s) => L.startSession(s, c.id, absent), '開始上堂')) ui.absentDraft = {};
   },
   endSession: () => {
+    clockRunning = false;
     const n = Object.keys(state.session.standing).length;
     confirmBox('落堂？', `${n ? `站緊的 ${n} 位同學會自動坐返低。` : ''}今堂共問咗 ${state.session.qCount} 題。`, () => {
       const ses = state.session;
