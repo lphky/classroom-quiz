@@ -5,6 +5,7 @@ test('測試班、圖鑑、合作任務及倒數',async({page})=>{
  await expect(page.locator('.tile')).toHaveCount(12);
  await page.getByRole('button',{name:'開始上堂'}).click();
  await expect(page.locator('progress')).toHaveAttribute('value','0');
+ if(test.info().project.name==='desktop') await page.screenshot({path:'/home/workspace/classroom-quiz/test-results/desktop-preview.png',fullPage:true});
  await page.getByRole('button',{name:'開始倒數'}).click();
  await expect(page.locator('#questClock')).not.toHaveText('30');
  await page.getByRole('button',{name:'重設 30 秒'}).click();
