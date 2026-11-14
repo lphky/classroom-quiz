@@ -3,11 +3,25 @@ import { addDemo } from './demo.mjs';
 import { load, loadUndo, save, UNDO_MAX } from './store.mjs';
 
 const ITEM_KEYS = L.ITEM_KEYS;
+const glyph = (paths) => `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+const cardArt = {
+  exempt: glyph('<path d="M24 4 40 11v12c0 10-16 21-16 21S8 33 8 23V11L24 4Z"/><path d="m17 24 5 5 10-12"/>'),
+  designate: glyph('<circle cx="14" cy="14" r="6"/><path d="M4 36v-5a10 10 0 0 1 20 0v5M29 14h13m-6-6 7 6-7 6M28 30h14m-7-6 7 6-7 6"/>'),
+  down: glyph('<path d="M9 9h30v30H9zM24 16v17m-7-7 7 7 7-7"/>'),
+  up: glyph('<circle cx="24" cy="24" r="19"/><path d="M24 34V14m-8 8 8-8 8 8"/>')
+};
+const navArt = {
+ class:glyph('<rect x="6" y="6" width="14" height="14" rx="2"/><rect x="28" y="6" width="14" height="14" rx="2"/><rect x="6" y="28" width="14" height="14" rx="2"/><rect x="28" y="28" width="14" height="14" rx="2"/>'),
+ cards:glyph('<rect x="14" y="6" width="26" height="34" rx="4"/><path d="M7 12v29a3 3 0 0 0 3 3h22M21 23h12m-6-6v12"/>'),
+ students:glyph('<circle cx="18" cy="16" r="8"/><path d="M4 42v-5a14 14 0 0 1 28 0v5M33 9a8 8 0 0 1 0 15m5 6c6 2 6 6 6 12"/>'),
+ report:glyph('<path d="M7 5v37h36M16 33V22m10 11V12m10 21V5"/>'),
+ settings:glyph('<path d="M5 12h38M5 24h38M5 36h38"/><circle cx="16" cy="12" r="4" fill="currentColor"/><circle cx="32" cy="24" r="4" fill="currentColor"/><circle cx="20" cy="36" r="4" fill="currentColor"/>')
+};
 const cardIcons = {exempt:'◇',designate:'↗',down:'↓',up:'↑'};
 const ITEMS = Object.fromEntries(ITEM_KEYS.map(k=>[k,{...L.ITEMS[k],icon:cardIcons[k]}]));
 let state = load();
 let undo = loadUndo();
-const ui = { tab: 'class', modal: null, rolling: false, absentDraft: {} };
+const ui = { tab: 'class', modal: null, rolling: false, absentDraft: {}, filter: 'all', search: '' };
 let rng = Math.random;
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -71,7 +85,7 @@ const TABS = [
 ];
 
 function renderHeader() {
-  $('#tabs').innerHTML = TABS.map(([k, n]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}"><span class="nav-icon" aria-hidden="true">${({class:"▦",cards:"◇",students:"◉",report:"▥",settings:"⚙"})[k]}</span><span>${n}</span></button>`).join('');
+  $('#tabs').innerHTML = TABS.map(([k, n]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}"><span class="nav-icon" aria-hidden="true">${navArt[k]}</span><span>${n}</span></button>`).join('');
   const sel = $('#classSelect');
   sel.innerHTML = state.classes.length
     ? state.classes.map((c) => `<option value="${c.id}"${c.id === state.activeClassId ? ' selected' : ''}>${esc(c.name)}</option>`).join('')
@@ -91,15 +105,16 @@ function render() {
   else if (ui.tab === 'students') app.innerHTML = viewStudents();
   else if (ui.tab === 'report') app.innerHTML = viewReport();
   else app.innerHTML = viewSettings();
-  app.insertAdjacentHTML('afterbegin', `<div class="page-heading"><div><span class="eyebrow">CLASSROOM / ${ui.tab.toUpperCase()}</span><h1>${({class:'每次參與，都值得被看見。',cards:'道具收藏室',students:'你的班級，井然有序。',report:'讓進步留下紀錄。',settings:'打造你的課堂節奏。'})[ui.tab]}</h1><p>課堂冒險局 · 教師工作台</p></div><span class="live-badge">${state.session?'課堂進行中':'準備就緒'}</span></div>`);
+  app.insertAdjacentHTML('afterbegin', `<div class="page-heading"><div><span class="eyebrow">CLASSROOM / ${ui.tab.toUpperCase()}</span><h1>${({class:'課堂控制室',cards:'道具收藏室',students:'你的班級，井然有序。',report:'讓進步留下紀錄。',settings:'打造你的課堂節奏。'})[ui.tab]}</h1><p>CLASSROOM PLAYBOOK · 每一次參與，都算數。</p></div><span class="live-badge">${state.session?'課堂進行中':'準備就緒'}</span></div>`);
   renderModal();
+  filterRoster();
 }
 
 function viewCards() {
-  return `<section class="hero"><span class="eyebrow">THE INVENTORY</span><h1>每張卡，都有出場時機。</h1><p>主動舉手答對即可抽卡。站立同學答對可坐低，不抽卡。</p></section><div class="inventory">${ITEM_KEYS.map((k,i)=>`<article class="collectible tone-${i}"><span class="eyebrow">NO. 0${i+1} / SKILL CARD</span><div class="card-symbol">${ITEMS[k].icon}</div><h2>${esc(ITEMS[k].name)}</h2><p>${esc(ITEMS[k].desc)}</p><footer>${i<2?'被抽中時使用':'點學生 → 背包使用'}${k==='up'?' · 老師批准':''}</footer></article>`).join('')}</div><section class="card"><h3>公平遊戲約定</h3><p>指定不能連鎖轉嫁；權重有上下限；老師可以否決調高卡。背包容量及抽卡比例可在設定調整。</p></section>`;
+  return `<section class="hero"><span class="eyebrow">THE INVENTORY</span><h1>小小一張卡，換個新玩法。</h1><p>主動舉手答對即可抽卡。站立同學答對可坐低，不抽卡。</p></section><div class="inventory">${ITEM_KEYS.map((k,i)=>`<article class="collectible tone-${i}"><span class="eyebrow">NO. 0${i+1} / SKILL CARD</span><div class="card-symbol">${cardArt[k]}</div><h2>${esc(ITEMS[k].name)}</h2><p>${esc(ITEMS[k].desc)}</p><footer>${i<2?'被抽中時使用':'點學生 → 背包使用'}${k==='up'?' · 老師批准':''}</footer></article>`).join('')}</div><section class="card"><h3>公平遊戲約定</h3><p>指定不能連鎖轉嫁；權重有上下限；老師可以否決調高卡。背包容量及抽卡比例可在設定調整。</p></section>`;
 }
 function viewNewClass(intro = true) {
-  return `${intro ? '<section class="hero"><span class="eyebrow">CLASSROOM QUEST / 教師控制台</span><h1>讓每一次舉手，<br>成為新的冒險。</h1><p>抽問、收集道具、一起達成全班挑戰。</p><button class="btn primary big" data-act="demo">一鍵體驗 · 12 人測試班</button></section>' : ''}<section class="card narrow">
+  return `${intro ? '<section class="hero"><span class="eyebrow">CLASSROOM QUEST / 教師控制台</span><h1>今天的精彩，<br>由一個舉手開始。</h1><p>抽問、收集道具、一起達成全班挑戰。</p><button class="btn primary big" data-act="demo">一鍵體驗 · 12 人測試班</button></section>' : ''}<section class="card narrow">
     ${intro ? '<h2>開始：建立第一班</h2><p class="muted">貼上學生名單，每行一位。可以寫「座號 姓名」，例如「1 陳大文」。</p>' : '<h2>新增班別</h2>'}
     <form data-form="newClass" class="stack">
       <label>班名<input name="name" required placeholder="例如：3A 中文"></label>
@@ -138,7 +153,10 @@ function viewLive(c) {
   const answers = state.logs.filter(e=>e.sessionId===ses.id && e.type==='answer');
   const wins = answers.filter(e=>e.correct).length;
   const goal = 10;
-  return `<section class="hero live-hero"><div><span class="eyebrow">LIVE CLASSROOM / ${esc(c.name)}</span><h1>${wins>=goal?'全班挑戰達成！':'一個班，一起進步。'}</h1><p>合作任務：全班累積答對 10 題，不額外改動個人成績。</p><div class="mission"><progress max="10" value="${Math.min(10,wins)}"></progress><b>${wins} / 10</b></div></div><div class="clock-panel"><span class="eyebrow">思考倒數</span><strong id="questClock">${clockLeft}</strong><div class="row"><button class="btn ghost" data-act="timer">${clockRunning?'暫停':'開始'}倒數</button><button class="btn ghost" data-act="resetTimer">重設 30 秒</button></div></div></section><section class="actions">
+  const participants = new Set(answers.map(e=>e.studentId)).size;
+  const streak = answers.slice().reverse().findIndex(e=>!e.correct);
+  const combo = streak < 0 ? answers.length : streak;
+  return `<section class="hero live-hero"><div><span class="eyebrow">LIVE CLASSROOM / ${esc(c.name)}</span><h1>${wins>=goal?'任務達成，漂亮！':'把課堂，變成主場。'}</h1><p>合作任務：全班累積答對 10 題，不額外改動個人成績。</p><div class="mission"><progress max="10" value="${Math.min(10,wins)}"></progress><b>${wins} / 10</b></div></div><div class="clock-panel"><span class="eyebrow">思考倒數</span><strong id="questClock">${clockLeft}</strong><div class="row"><button class="btn ghost" data-act="timer">${clockRunning?'暫停':'開始'}倒數</button><button class="btn ghost" data-act="resetTimer">重設 30 秒</button></div></div></section><section class="pulse-grid" aria-label="課堂即時數據"><div class="pulse"><strong>${answers.length ? Math.round(wins/answers.length*100) : 0}%</strong><span>今堂答對率<small>每次嘗試，都有進步</small></span></div><div class="pulse"><strong>${participants}</strong><span>已參與同學<small>讓更多聲音被聽見</small></span></div><div class="pulse"><strong>${combo}<small> COMBO</small></strong><span>連續答對<small>全班合作，一起突破</small></span></div></section><section class="actions">
       <button class="btn hand big" data-act="volunteer"><span class="action-icon" aria-hidden="true">✦</span><span class="action-copy"><strong>有人舉手</strong><small>鼓勵主動參與 · 答對抽卡</small></span><span class="action-arrow">↗</span></button>
       <button class="btn draw big" data-act="draw"><span class="action-icon" aria-hidden="true">⌘</span><span class="action-copy"><strong>冇人舉手，抽人</strong><small>隨機邀請 · 讓每位都有機會</small></span><span class="action-arrow">↗</span></button>
     </section>
@@ -147,12 +165,13 @@ function viewLive(c) {
         <div class="stats"><span>已問 <b>${ses.qCount}</b> 題</span><span class="pill standing">站立 ${standingCount} 人</span><span class="muted">可抽 ${cands.length} 人</span></div>
         <button class="btn ghost" data-act="endSession">落堂</button>
       </div>
-      <div class="grid">
+      <div class="roster-tools"><input id="rosterSearch" type="search" placeholder="搜尋姓名或座號…" aria-label="搜尋學生" value="${esc(ui.search)}"><div class="filters" aria-label="學生狀態篩選">${[['all','全班'],['standing','站立優先'],['seated','坐低'],['absent','缺席']].map(([v,n])=>`<button data-act="filterRoster" data-v="${v}" class="${ui.filter===v?'on':''}" aria-pressed="${ui.filter===v}">${n}</button>`).join('')}</div></div>
+      <div class="grid" id="liveRoster">
         ${c.students
           .map((s) => {
             const st = L.studentStatus(state, s.id);
             const label = { seated: '坐低', standing: '站立', absent: '缺席' }[st];
-            return `<button class="tile ${st}" data-act="studentSheet" data-id="${s.id}">
+            return `<button class="tile ${st}" data-status="${st}" data-search="${esc(s.no+' '+s.name)}" data-act="studentSheet" data-id="${s.id}">
               <span class="no">${esc(s.no)}</span><span class="nm">${esc(s.name)}</span>
               <span class="st">${label}${state.settings.showOdds && chance[s.id] != null ? ` · ${pct(chance[s.id])}` : ''}</span>
               <span class="chips">${itemChips(s, true)}</span><span class="score">${s.score}分</span></button>`;
@@ -259,7 +278,7 @@ function modalBody(m) {
     const present = c.students.filter((s) => !state.session.absent[s.id]);
     const standing = present.filter((s) => state.session.standing[s.id]);
     const seated = present.filter((s) => !state.session.standing[s.id]);
-    return `<h2>✋ 邊位同學舉手？</h2>
+    return `<h2>選擇舉手的同學</h2>
       ${standing.length ? `<h3 class="prio">站立同學優先</h3>${studentPicker(standing, 'pickVolunteer', () => '<span class="st">優先</span>')}` : ''}
       <h3>坐低的同學</h3>${studentPicker(seated, 'pickVolunteer', (s) => `<span class="chips">${itemChips(s, true)}</span>`)}
       <div class="row end">${close}</div>`;
@@ -282,12 +301,12 @@ function modalBody(m) {
   }
   if (m.type === 'draw') {
     const q = state.session.question;
-    if (ui.rolling || !q) return `<h2>🎲 抽緊…</h2><div class="roll" id="roll">${esc(m.rollText || '')}</div>`;
+    if (ui.rolling || !q) return `<h2>正在邀請一位同學…</h2><div class="roll" id="roll">${esc(m.rollText || '')}</div>`;
     const s = stu(q.answererId);
     const by = q.designatedBy ? stu(q.designatedBy) : null;
     const canEx = L.canUseExempt(state);
     const canDe = L.canUseDesignate(state);
-    return `<h2>${by ? `👉 ${esc(by.name)} 指定` : '🎲 抽中'}</h2><div class="roll done">${esc(s.name)}</div>
+    return `<h2>${by ? `👉 ${esc(by.name)} 指定` : '這一題，交給你'}</h2><div class="roll done">${esc(s.name)}</div>
       ${by ? '<p class="muted center">被指定的同學答錯要站立，亦唔可以再用指定卡。</p>' : ''}
       <div class="answer"><button class="btn ok big" data-act="drawResult" data-v="1">✔ 答對</button><button class="btn no big" data-act="drawResult" data-v="0">✘ 答錯（罰站）</button></div>
       ${canEx || canDe ? `<div class="row center gap wrap">${canEx ? `<button class="btn item" data-act="useExempt">${ITEMS.exempt.icon} 用免答卡（剩 ${s.items.exempt}）</button>` : ''}${canDe ? `<button class="btn item" data-act="chooseDesignate">${ITEMS.designate.icon} 用指定同學卡（剩 ${s.items.designate}）</button>` : ''}</div>` : ''}
@@ -402,9 +421,28 @@ setInterval(() => {
   clockLeft = Math.max(0, clockLeft-1);
   const el = $('#questClock');
   if (el) el.textContent = clockLeft || '時間到';
-  if (!clockLeft) { clockRunning=false; toast('思考時間到，老師可以邀請同學作答'); }
+  if (!clockLeft) { clockRunning=false; const btn = $('[data-act=timer]'); if(btn) btn.textContent='開始倒數'; toast('思考時間到，老師可以邀請同學作答'); }
 }, 1000);
+function filterRoster() {
+  const grid = $('#liveRoster');
+  if (!grid) return;
+  let visible = 0;
+  grid.querySelectorAll('.tile').forEach(tile => {
+    const show = (ui.filter === 'all' || tile.dataset.status === ui.filter) && tile.dataset.search.toLowerCase().includes(ui.search.trim().toLowerCase());
+    tile.hidden = !show;
+    if (show) visible++;
+  });
+  grid.querySelector('.empty-roster')?.remove();
+  if (!visible) grid.insertAdjacentHTML('beforeend','<p class="empty-roster">沒有符合的同學。試試其他姓名或狀態。</p>');
+}
+
+document.addEventListener('input', ev => {
+  if (ev.target.id === 'rosterSearch') { ui.search = ev.target.value; filterRoster(); }
+});
+
 const actions = {
+  filterRoster: el => { ui.filter = el.dataset.v; render(); },
+  focusMode: () => { document.body.classList.toggle('focus-mode'); },
   timer: () => { if (!clockLeft) clockLeft=30; clockRunning=!clockRunning; render(); },
   resetTimer: () => { clockLeft=30; clockRunning=false; render(); },
   demo: () => { if (attempt(addDemo, '建立測試班')) { ui.tab='class'; render(); toast('12 位虛構學生已加入，每人有四種道具各一張'); } },
@@ -423,7 +461,7 @@ const actions = {
   startSession: () => {
     const c = cls();
     const absent = c.students.filter((s) => ui.absentDraft[s.id]).map((s) => s.id);
-    if (attempt((s) => L.startSession(s, c.id, absent), '開始上堂')) ui.absentDraft = {};
+    if (attempt((s) => L.startSession(s, c.id, absent), '開始上堂')) { ui.absentDraft = {}; ui.filter = 'all'; ui.search = ''; }
   },
   endSession: () => {
     clockRunning = false;

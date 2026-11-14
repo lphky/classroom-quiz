@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>課堂冒險局 · 教師工作台</title>
+  <title>課堂冒險局 · Classroom Playbook</title>
   <meta name="description" content="課堂答問管理：抽人、罰站、道具卡及計分">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
   <link rel="stylesheet" href="css/style.css">
@@ -13,10 +13,11 @@
     <div class="brand">課堂冒險局</div>
     <nav class="tabs" id="tabs"></nav>
     <div class="top-right">
-      <button class="btn ghost" data-act="fullscreen">⛶ 全螢幕</button><select id="classSelect" aria-label="揀班"></select>
+      <button class="btn ghost" data-act="fullscreen">⛶ 全螢幕</button><button class="btn ghost" data-act="focusMode">專注投影</button><select id="classSelect" aria-label="揀班"></select>
       <button id="undoBtn" class="btn ghost" title="復原上一步">↶ 復原</button>
     </div>
   </header>
+  <button id="exitFocus" class="btn primary" data-act="focusMode">退出專注模式</button>
   <main id="app"></main>
   <div id="modal" class="modal-wrap" hidden></div>
   <div id="toast" class="toast" hidden></div>
