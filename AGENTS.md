@@ -5,3 +5,5 @@
 - 規則設計見 DESIGN.md（用戶 2026-11-14 已確認第一版做法：站立者答對不得道具、指定卡只可指定坐低者、調高卡需老師批准）。
 - `?test` 開放 `window.__cq`（state、setRng）。改動後執行 `npm test`（node 單元測試 + Playwright 三種尺寸）。
 - 測試伺服器用 `scripts/serve.mjs`（python http.server 在此環境會卡死）。
+
+- 現行視覺：霧白／墨黑／電光紫；700px 以下使用底部導航。css/style.css 為完整樣式，勿恢復舊綠色主題。tests/layout.spec.js 驗證三尺寸布局與截圖。

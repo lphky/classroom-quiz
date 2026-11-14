@@ -243,7 +243,9 @@ function renderModal() {
     return;
   }
   wrap.hidden = false;
-  wrap.innerHTML = `<div class="modal" role="dialog" aria-modal="true">${modalBody(m)}</div>`;
+  wrap.innerHTML = `<div class="modal" role="dialog" aria-modal="true" tabindex="-1">${modalBody(m)}</div>`;
+  const heading = wrap.querySelector("h2");
+  if (heading) { heading.id="dialogTitle"; wrap.firstElementChild.setAttribute("aria-labelledby", "dialogTitle"); }
 }
 
 function studentPicker(list, act, extra = () => '') {
@@ -339,6 +341,7 @@ function modalBody(m) {
 function openModal(m) {
   ui.modal = m;
   renderModal();
+  if (m) $(".modal").focus({preventScroll:true});
 }
 
 function confirmBox(title, html, onYes, opts = {}) {
@@ -570,6 +573,13 @@ $('#modal').addEventListener('click', (ev) => {
 });
 
 document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Tab' && ui.modal) {
+    const nodes = [...$('#modal').querySelectorAll('button:not(:disabled),input:not(:disabled),select,textarea,[tabindex="0"]')];
+    const first=nodes[0], last=nodes.at(-1);
+    if (!first) { ev.preventDefault(); return; }
+    if (ev.shiftKey && (document.activeElement===first || document.activeElement.classList.contains('modal'))) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && (document.activeElement===last || document.activeElement.classList.contains('modal'))) { ev.preventDefault(); first.focus(); }
+  }
   if (ev.key === 'Escape' && ui.modal && !ui.rolling && !state.session?.question) openModal(null);
 });
 
