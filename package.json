@@ -1,0 +1,14 @@
+{
+  "name": "classroom-quiz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "課堂抽問板：課堂答問管理（抽人、罰站、道具卡、計分）",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs && playwright test",
+    "start": "node scripts/serve.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1"
+  }
+}
