@@ -2,7 +2,9 @@ import * as L from './logic.mjs';
 import { addDemo } from './demo.mjs';
 import { load, loadUndo, save, UNDO_MAX } from './store.mjs';
 
-const { ITEMS, ITEM_KEYS } = L;
+const ITEM_KEYS = L.ITEM_KEYS;
+const cardIcons = {exempt:'◇',designate:'↗',down:'↓',up:'↑'};
+const ITEMS = Object.fromEntries(ITEM_KEYS.map(k=>[k,{...L.ITEMS[k],icon:cardIcons[k]}]));
 let state = load();
 let undo = loadUndo();
 const ui = { tab: 'class', modal: null, rolling: false, absentDraft: {} };
@@ -69,7 +71,7 @@ const TABS = [
 ];
 
 function renderHeader() {
-  $('#tabs').innerHTML = TABS.map(([k, n]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}">${n}</button>`).join('');
+  $('#tabs').innerHTML = TABS.map(([k, n]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}"><span class="nav-icon" aria-hidden="true">${({class:"▦",cards:"◇",students:"◉",report:"▥",settings:"⚙"})[k]}</span><span>${n}</span></button>`).join('');
   const sel = $('#classSelect');
   sel.innerHTML = state.classes.length
     ? state.classes.map((c) => `<option value="${c.id}"${c.id === state.activeClassId ? ' selected' : ''}>${esc(c.name)}</option>`).join('')
@@ -89,6 +91,7 @@ function render() {
   else if (ui.tab === 'students') app.innerHTML = viewStudents();
   else if (ui.tab === 'report') app.innerHTML = viewReport();
   else app.innerHTML = viewSettings();
+  app.insertAdjacentHTML('afterbegin', `<div class="page-heading"><div><span class="eyebrow">CLASSROOM / ${ui.tab.toUpperCase()}</span><h1>${({class:'每次參與，都值得被看見。',cards:'道具收藏室',students:'你的班級，井然有序。',report:'讓進步留下紀錄。',settings:'打造你的課堂節奏。'})[ui.tab]}</h1><p>課堂冒險局 · 教師工作台</p></div><span class="live-badge">${state.session?'課堂進行中':'準備就緒'}</span></div>`);
   renderModal();
 }
 
@@ -135,9 +138,9 @@ function viewLive(c) {
   const answers = state.logs.filter(e=>e.sessionId===ses.id && e.type==='answer');
   const wins = answers.filter(e=>e.correct).length;
   const goal = 10;
-  return `<section class="hero live-hero"><div><span class="eyebrow">LIVE CLASSROOM / ${esc(c.name)}</span><h1>${wins>=goal?'全班挑戰達成！ ✨':'一起點亮知識星球。'}</h1><p>合作任務：全班累積答對 10 題，不額外改動個人成績。</p><div class="mission"><progress max="10" value="${Math.min(10,wins)}"></progress><b>${wins} / 10</b></div></div><div class="clock-panel"><span class="eyebrow">思考倒數</span><strong id="questClock">${clockLeft}</strong><div class="row"><button class="btn ghost" data-act="timer">${clockRunning?'暫停':'開始'}倒數</button><button class="btn ghost" data-act="resetTimer">重設 30 秒</button></div></div></section><section class="actions">
-      <button class="btn hand big" data-act="volunteer">✋ 有人舉手</button>
-      <button class="btn draw big" data-act="draw">🎲 冇人舉手，抽人</button>
+  return `<section class="hero live-hero"><div><span class="eyebrow">LIVE CLASSROOM / ${esc(c.name)}</span><h1>${wins>=goal?'全班挑戰達成！':'一個班，一起進步。'}</h1><p>合作任務：全班累積答對 10 題，不額外改動個人成績。</p><div class="mission"><progress max="10" value="${Math.min(10,wins)}"></progress><b>${wins} / 10</b></div></div><div class="clock-panel"><span class="eyebrow">思考倒數</span><strong id="questClock">${clockLeft}</strong><div class="row"><button class="btn ghost" data-act="timer">${clockRunning?'暫停':'開始'}倒數</button><button class="btn ghost" data-act="resetTimer">重設 30 秒</button></div></div></section><section class="actions">
+      <button class="btn hand big" data-act="volunteer"><span class="action-icon" aria-hidden="true">✦</span><span class="action-copy"><strong>有人舉手</strong><small>鼓勵主動參與 · 答對抽卡</small></span><span class="action-arrow">↗</span></button>
+      <button class="btn draw big" data-act="draw"><span class="action-icon" aria-hidden="true">⌘</span><span class="action-copy"><strong>冇人舉手，抽人</strong><small>隨機邀請 · 讓每位都有機會</small></span><span class="action-arrow">↗</span></button>
     </section>
     <section class="card">
       <div class="row between wrap">
