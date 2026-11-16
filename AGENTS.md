@@ -6,4 +6,4 @@
 - `?test` 開放 `window.__cq`（state、setRng）。改動後執行 `npm test`（node 單元測試 + Playwright 三種尺寸）。
 - 測試伺服器用 `scripts/serve.mjs`（python http.server 在此環境會卡死）。
 
-- 現行視覺：深墨藍／亮青檸 Classroom Playbook；700px 以下底部導航，電腦支援專注投影。css/style.css 為完整樣式；卡牌及導航 SVG 在 app.mjs。課堂搜尋／狀態篩選只改顯示，不影響抽人名單；即時數據與 COMBO 不改計分。tests/playbook.spec.js 驗證新增流程；tests/layout.spec.js 驗證三尺寸布局與截圖。test-data/demo-backup.json 為虛構測試備份。
+- 現行視覺（2026-11-16 重做）：淺色應用程式風格，900px 以下底部導航；按鈕只用 app.mjs 內 `P` 線條 SVG 圖示，不用 emoji（tests/motion.spec.js 檢查）。道具為 `gameCard()` 遊戲卡牌，插畫 `assets/cards/*.webp`（AI 生成，540px）；動畫：`cardFx` 出卡、`.card-flip` 抽卡翻牌、`burst` 粒子、按鈕 ripple，全部受 reduceMotion／設定動畫開關控制。css/style.css 為完整樣式。課堂搜尋／篩選只改顯示；即時數據與 COMBO 不改計分。測試避免同一文字出現兩次（Playwright text= 為嚴格匹配）。test-data/demo-backup.json 為虛構測試備份。

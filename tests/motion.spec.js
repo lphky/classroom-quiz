@@ -1,0 +1,24 @@
+import { test, expect } from '@playwright/test';
+test('卡牌動畫、按鈕無 emoji', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto('/?test');
+  await page.getByRole('button', { name: '一鍵體驗 · 12 人測試班' }).click();
+  await page.getByRole('button', { name: '開始上堂' }).click();
+  const labels = await page.locator('button').allInnerTexts();
+  expect(labels.join('').match(/\p{Extended_Pictographic}/u)).toBeNull();
+  await page.evaluate(() => window.__cq.setRng([0]));
+  await page.getByRole('button', { name: /冇人舉手/ }).click();
+  await expect(page.locator('.roll.done')).toBeVisible({ timeout: 6000 });
+  await page.getByRole('button', { name: /用免答卡/ }).click();
+  await expect(page.locator('.fx-stage .gcard[data-k="exempt"]')).toBeVisible();
+  await expect(page.locator('.fx-stage')).toHaveCount(0, { timeout: 4000 });
+  await expect(page.locator('.roll.done')).toBeVisible({ timeout: 6000 });
+  await page.getByRole('button', { name: '答對', exact: true }).click();
+  await page.getByRole('button', { name: '好', exact: true }).click();
+  await page.getByRole('button', { name: '道具圖鑑' }).click();
+  await expect(page.locator('.collectible img')).toHaveCount(4);
+  const loaded = await page.locator('.collectible img').evaluateAll((imgs) => Promise.all(imgs.map((i) => i.decode().then(() => i.naturalWidth > 0))));
+  expect(loaded.every(Boolean)).toBe(true);
+  expect(errors).toEqual([]);
+});
