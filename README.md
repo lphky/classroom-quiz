@@ -4,6 +4,8 @@
 
 **直接用（老師登入版）：** https://classroom-quiz-porscheyeung.zocomputer.io/
 
+**老師使用說明書：** https://classroom-quiz-porscheyeung.zocomputer.io/guide/ （圖文網頁，另有 [PDF](guide/課堂冒險局-老師使用說明書.pdf)）
+
 舊網址 https://lphky.github.io/classroom-quiz/ 冇伺服器，打開會顯示「前往新版」及下載該部電腦舊資料的按鈕。
 
 ## 介面

@@ -9,3 +9,6 @@
 - `?test` 開放 `window.__cq`（state、synced、setRng）。改動後執行 `npm test`（node 單元測試 + Playwright 三種尺寸；Playwright 以 CQ_TEST=1 開臨時資料夾的伺服器，`tests/helpers.js` 的 `login()` 每個測試建新老師）。改完程式碼要 `update_user_service` 重啟 classroom-quiz。
 
 - 現行視覺（2026-11-16 重做）：淺色應用程式風格，900px 以下底部導航；按鈕只用 app.mjs 內 `P` 線條 SVG 圖示，不用 emoji（tests/motion.spec.js 檢查）。道具為 `gameCard()` 遊戲卡牌，插畫 `assets/cards/*.webp`（AI 生成，540px）；動畫：`cardFx` 出卡、`.card-flip` 抽卡翻牌、`burst` 粒子、按鈕 ripple，全部受 reduceMotion／設定動畫開關控制。css/style.css 為完整樣式。課堂搜尋／篩選只改顯示；即時數據與 COMBO 不改計分。測試避免同一文字出現兩次（Playwright text= 為嚴格匹配）。test-data/demo-backup.json 為虛構測試備份。
+
+- 老師說明書（2026-11-16）：`guide/index.html`（伺服器 `/guide/` 靜態提供，登入頁及「我的帳戶」有連結）＋ `guide/課堂冒險局-老師使用說明書.pdf`（14 頁 A4，由 index.html 列印產生再以 gs /ebook 壓縮）。截圖由 `node scripts/shoot-guide.mjs [a|b|c]` 用臨時 CQ_TEST 伺服器產生 PNG，再轉 1600px webp；介面改動後要重影及重出 PDF。說明書公開，不要寫入任何密碼。
+- 測試老師帳戶（正式服務）：test.teacher、teacher.chan（陳老師）、teacher.wong（黃老師），均非管理員、不需改密碼；密碼只在對話交給用戶，不入 Git。

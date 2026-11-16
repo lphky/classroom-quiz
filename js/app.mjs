@@ -663,7 +663,7 @@ function modalBody(m) {
         <label class="field"><span>新密碼（最少 8 字）</span><input name="next" type="password" required minlength="8" autocomplete="new-password"></label>
         <label class="field"><span>再輸入新密碼</span><input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label></div>
         <div><button class="btn secondary">${ic('key')}更改密碼</button></div></form>
-      <div class="m-foot">${me.isAdmin ? `<button class="btn ghost" data-act="tab" data-v="admin">${ic('key')}管理老師帳戶</button>` : ''}<button class="btn danger-ghost" data-act="logout">${ic('logout')}登出</button><button class="btn secondary" data-act="closeModal">關閉</button></div>`;
+      <div class="m-foot"><a class="btn ghost" href="/guide/" target="_blank" rel="noopener" style="text-decoration:none">使用說明書</a>${me.isAdmin ? `<button class="btn ghost" data-act="tab" data-v="admin">${ic('key')}管理老師帳戶</button>` : ''}<button class="btn danger-ghost" data-act="logout">${ic('logout')}登出</button><button class="btn secondary" data-act="closeModal">關閉</button></div>`;
   }
   if (m.type === 'cred') {
     return `<div class="m-head"><span class="m-ic ok">${ic('check')}</span><div><h2>${esc(m.title)}</h2><p class="muted">請將以下資料交給${esc(m.name)}。第一次登入時要自行更改密碼。</p></div></div>
@@ -1232,7 +1232,7 @@ function gateLogin(msg = '') {
     <label class="field"><span>密碼</span><input name="password" type="password" autocomplete="current-password" required></label>
     <p class="form-err" role="alert"${msg ? '' : ' hidden'}>${esc(msg)}</p>
     <button class="btn primary xl">${ic('send')}登入</button>
-    <p class="muted small">忘記密碼？請學校的管理員幫你重設。</p></form>`);
+    <p class="muted small">忘記密碼？請學校的管理員幫你重設。<a href="/guide/" target="_blank" rel="noopener">使用說明書</a></p></form>`);
 }
 
 function gateFirstPassword(msg = '') {

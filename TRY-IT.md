@@ -2,6 +2,8 @@
 
 網址：https://classroom-quiz-porscheyeung.zocomputer.io/ （要登入）
 
+老師說明書：https://classroom-quiz-porscheyeung.zocomputer.io/guide/ （圖文版，可下載 PDF）
+
 1. 用管理員帳戶登入，第一次要改密碼。
 2. 按「一鍵體驗 · 12 人測試班」：建立 12 位虛構學生（每人四種道具各一張）及 3 份測試禮物——珍珠奶茶（2 片）、免一次功課（1 片）、當一日小老師（4 片）。
 3. 到「禮物」頁：陳星晴已集齊珍珠奶茶、黃子軒有免一次功課，可以即刻試「換領」動畫；李浩然只有 1/2，張樂彤差 4/4。

@@ -13,8 +13,8 @@ const TEST = process.env.CQ_TEST === '1';
 const SESSION_DAYS = 30;
 const MAX_BODY = 8 * 1024 * 1024;
 const COOKIE = 'cq_session';
-const STATIC_DIRS = ['css', 'js', 'assets', 'test-data'];
-const TYPES = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8' };
+const STATIC_DIRS = ['css', 'js', 'assets', 'test-data', 'guide'];
+const TYPES = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.md': 'text/plain; charset=utf-8', '.pdf': 'application/pdf' };
 
 mkdirSync(join(DATA, 'states'), { recursive: true });
 mkdirSync(join(DATA, 'archive'), { recursive: true });
@@ -346,7 +346,9 @@ async function api(req, res, path) {
 
 async function serveStatic(req, res, path) {
   if (path === '/' || path === '/index.html') path = '/index.html';
+  else if (path === '/guide') return res.writeHead(301, { location: '/guide/' }).end();
   else {
+    if (path.endsWith('/')) path += 'index.html';
     const top = path.split('/')[1];
     if (!STATIC_DIRS.includes(top)) return res.writeHead(404).end('not found');
   }
