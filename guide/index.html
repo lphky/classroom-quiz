@@ -58,7 +58,9 @@
     .wrap { padding: 0; max-width: none; }
     header.hero { padding: 22px 26px; border-radius: 16px; grid-template-columns: 1.3fr 1fr; }
     header.hero h1 { font-size: 30px; }
-    nav.toc { margin: 14px 0; padding: 12px 18px; }
+    header.hero { overflow: hidden; box-shadow: none; }
+    header.hero img { box-shadow: none; border: 1px solid rgba(255,255,255,.25); }
+    nav.toc { margin: 14px 0; padding: 12px 18px; box-shadow: none; columns: auto; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: repeat(7, auto); grid-auto-flow: column; column-gap: 32px; border-color: #d9dce6; }
     section { border:none; padding: 0; margin: 0 0 14px; break-inside: auto; }
     section.page { break-before: page; }
     section.flow-on { break-before: auto; }
