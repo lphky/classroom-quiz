@@ -9,5 +9,5 @@ export default {
     { name: 'tablet', use: { viewport: { width: 820, height: 1180 }, hasTouch: true } },
     { name: 'phone', use: { viewport: { width: 390, height: 844 }, hasTouch: true } },
   ],
-  webServer: { command: 'node scripts/serve.mjs', url: 'http://127.0.0.1:4191', reuseExistingServer: false },
+  webServer: { command: 'rm -rf /tmp/cq-e2e && CQ_TEST=1 CQ_DATA_DIR=/tmp/cq-e2e PORT=4191 CQ_HOST=127.0.0.1 node server/server.mjs', url: 'http://127.0.0.1:4191/api/health', reuseExistingServer: false },
 };

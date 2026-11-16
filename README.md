@@ -2,7 +2,9 @@
 
 老師課堂用的答問管理工具：抽人作答、罰站、舉手抽道具卡、計分及匯出成績。
 
-**直接用：** https://lphky.github.io/classroom-quiz/
+**直接用（老師登入版）：** https://classroom-quiz-porscheyeung.zocomputer.io/
+
+舊網址 https://lphky.github.io/classroom-quiz/ 冇伺服器，打開會顯示「前往新版」及下載該部電腦舊資料的按鈕。
 
 ## 介面
 
@@ -23,17 +25,31 @@
 - 權重預設 100，每張卡 ±20，範圍 40–200；落堂後所有人自動坐返低。
 - 分數、機率、上下限、背包上限、動畫等全部可以喺「設定」改。詳細規則見 [DESIGN.md](DESIGN.md)。
 
+## 老師帳戶
+
+- 要登入先可以用。每位老師有自己的班別、學生、禮物及紀錄，互不相通。
+- **管理員**可以新增老師、重設密碼、停用／重新啟用、刪除（資料會封存，唔會即時永久刪除）、設定或取消管理員；老師可以同時是管理員。系統最少保留一位管理員，管理員唔可以停用或刪除自己。
+- 新帳戶及重設密碼後，第一次登入要自行改密碼。連續 8 次密碼錯誤會暫停該帳戶 15 分鐘登入。
+
+## 老師禮物（碎片收集）
+
+- 「禮物」頁可以自訂獎賞，例如「珍珠奶茶」，並揀分成 1 至 4 張碎片。
+- 主動舉手答對時，禮物同四款技能卡一齊按比重抽。抽中禮物會隨機得到其中一片，例如「珍珠奶茶 1/2」。
+- 集齊所有碎片（1/2 同 2/2）先可以換領；換領會扣除一套碎片，並減少「可換份數」（可設不限）。份數用完，該禮物暫停被抽。
+- 碎片唔佔背包位置；老師可以喺學生背包「老師調整」手動加減碎片。
+
 ## 資料
 
-所有資料只存喺該部機的瀏覽器（localStorage），唔會上傳。換機前喺「設定 → 下載備份」，新機「還原備份」。
+資料存喺 Zo 伺服器（`data/`，不入 Git）：`users.json` 帳戶（scrypt 密碼雜湊）、`sessions.json` 登入、`states/<老師id>.json` 每位老師的資料（每 50 個版本封存一份到 `archive/`）。同一老師用兩部機時以版本號防止互相覆蓋。舊版備份 JSON 可以喺「設定 → 還原備份」匯入。
 
 ## 開發
 
 ```bash
 npm install
 npx playwright install chromium
-npm start        # http://127.0.0.1:4191/
-npm test         # 規則單元測試 + 電腦/平板/手機瀏覽器測試
+node server/admin-cli.mjs create admin <密碼> --admin   # 首位管理員（先停伺服器）
+npm start        # http://127.0.0.1:4192/
+npm test         # 規則 + 伺服器單元測試 + 電腦/平板/手機瀏覽器測試
 ```
 
-純 HTML + ES Modules，冇 framework、冇後端。規則邏輯喺 `js/logic.mjs`（純函數），畫面喺 `js/app.mjs`。
+前端純 HTML + ES Modules；後端 `server/server.mjs` 為零依賴 Node 伺服器（只提供 `index.html`、`css/`、`js/`、`assets/`、`test-data/` 及 `/api/`）。規則邏輯喺 `js/logic.mjs`（純函數），畫面喺 `js/app.mjs`，同步喺 `js/store.mjs`。

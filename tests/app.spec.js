@@ -1,10 +1,11 @@
 import { test, expect } from '@playwright/test';
+import { login, synced } from './helpers.js';
 
 test('完整一堂：點名、舉手抽卡、抽人、免答卡、罰站、復原、落堂、報表', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?test');
+  await login(page);
 
   await page.fill('input[name=name]', '3A 中文');
   await page.fill('textarea[name=roster]', '1 陳大文\n2 李小明\n3 張美玲\n4 黃志強');
@@ -53,6 +54,7 @@ test('完整一堂：點名、舉手抽卡、抽人、免答卡、罰站、復�
   const [dl] = await Promise.all([page.waitForEvent('download'), page.click('text=下載成績 (CSV)')]);
   expect(dl.suggestedFilename()).toContain('成績');
 
+  await synced(page);
   await page.reload();
   await page.click('.tab:has-text("報表")');
   await expect(page.locator('table tbody tr').first()).toContainText('陳大文');
@@ -61,7 +63,7 @@ test('完整一堂：點名、舉手抽卡、抽人、免答卡、罰站、復�
 
 test('指定同學卡及調高卡（老師否決/批准）', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?test');
+  await login(page);
   await page.fill('input[name=name]', '4B');
   await page.fill('textarea[name=roster]', '甲\n乙\n丙');
   await page.click('text=建立班別');

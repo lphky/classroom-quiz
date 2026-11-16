@@ -1,6 +1,7 @@
 import {test,expect} from '@playwright/test';
+import { login, synced } from './helpers.js';
 test('主要畫面無水平溢出，導航與作答視窗可操作',async({page},info)=>{
- await page.goto('/?test');
+ await login(page);
  await page.getByRole('button',{name:'一鍵體驗 · 12 人測試班'}).click();
  await page.getByRole('button',{name:'開始上堂'}).click();
  await page.waitForTimeout(2800);

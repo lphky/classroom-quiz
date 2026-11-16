@@ -12,7 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="gated">
   <div class="shell">
     <aside class="side" id="side">
       <div class="brand"><span class="logo" aria-hidden="true"></span><span class="brand-name">課堂冒險局<small>Classroom Quest</small></span></div>
@@ -26,13 +26,16 @@
           <label class="select-wrap"><span class="sr-only">揀班</span><select id="classSelect" aria-label="揀班"></select></label>
           <button class="btn icon-btn desk-only" data-act="fullscreen" aria-label="全螢幕" title="全螢幕" id="fsBtn"></button>
           <button class="btn secondary desk-only" data-act="focusMode" id="focusBtn">專注投影</button>
+          <span id="syncPill" class="sync-pill" role="status"></span>
           <button id="undoBtn" class="btn secondary" title="復原上一步"></button>
+          <button id="acctBtn" class="btn acct-btn" data-act="account" aria-label="我的帳戶"></button>
         </div>
       </header>
       <main id="app"></main>
     </div>
   </div>
   <button id="exitFocus" class="btn primary" data-act="focusMode">退出專注模式</button>
+  <div id="gate" class="gate" hidden></div>
   <div id="modal" class="modal-wrap" hidden></div>
   <div id="fx" class="fx" aria-hidden="true"></div>
   <div id="toast" class="toast" role="status" hidden></div>

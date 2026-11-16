@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs && playwright test",
-    "start": "node scripts/serve.mjs"
+    "start": "node server/server.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.64.1"

@@ -1,6 +1,8 @@
 import * as L from './logic.mjs';
 import { addDemo } from './demo.mjs';
-import { load, loadUndo, save, UNDO_MAX } from './store.mjs';
+import { api, ApiError, loadRemote, loadUndo, clearUndo, createSync, legacyBackup, UNDO_MAX } from './store.mjs';
+
+const NEW_HOME = 'https://classroom-quiz-porscheyeung.zocomputer.io/';
 
 const ITEM_KEYS = L.ITEM_KEYS;
 
@@ -37,6 +39,16 @@ const P = {
   send: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   down: '<path d="M12 4v16M6 14l6 6 6-6"/>',
   up: '<path d="M12 20V4M6 10l6-6 6 6"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  key: '<circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M17 6l3 3M14 9l2 2"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21v-1a7 7 0 0 1 7-7h2a7 7 0 0 1 7 7v1"/>',
+  crown: '<path d="m3 7 4.5 4L12 4l4.5 7L21 7l-2 12H5L3 7Z"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  cloud: '<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.8A6 6 0 0 0 4.3 12 3.5 3.5 0 0 0 6 19h11.5Z"/>',
+  cloudOff: '<path d="m3 3 18 18"/><path d="M8.5 8.6A6 6 0 0 0 4.3 12 3.5 3.5 0 0 0 6 19h11"/><path d="M20.7 16.6A4.5 4.5 0 0 0 16.1 10.2a6 6 0 0 0-4.6-4.1"/>',
+  copy: '<rect x="8" y="8" width="13" height="13" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/>',
+  minus: '<path d="M5 12h14"/>',
+  puzzle: '<path d="M10 3h4v2a2 2 0 1 0 4 0V3h3v7h-2a2 2 0 1 0 0 4h2v7h-7v-2a2 2 0 1 0-4 0v2H3v-7h2a2 2 0 1 0 0-4H3V3h7Z"/>',
 };
 const ic = (k, cls = '') => `<svg class="ic ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[k]}</svg>`;
 
@@ -62,9 +74,33 @@ function gameCard(k, { cls = '', count = null, tilt = true } = {}) {
   </article>`;
 }
 
-let state = load();
-let undo = loadUndo();
-const ui = { tab: 'class', modal: null, rolling: false, absentDraft: {}, filter: 'all', search: '' };
+function giftArt(g, lit) {
+  const cols = Array.from({ length: g.pieces }, (_, i) => `<i class="${lit(i) ? 'on' : 'off'}"></i>`).join('');
+  return `<div class="gc-art gift-art" style="--gh:${hue(g.name) % 80 - 40}deg"><img src="assets/cards/gift.webp" alt="" loading="lazy" draggable="false"><span class="gc-slices" style="--n:${g.pieces}">${cols}</span>`;
+}
+
+function giftCard(g, { piece = null, owned = null, cls = '', count = null, tilt = true } = {}) {
+  const n = g.pieces;
+  const lit = piece != null ? (i) => i === piece : owned ? (i) => owned[i] > 0 : () => true;
+  const tag = n === 1 ? '完整禮物' : piece != null ? `碎片 ${piece + 1}/${n}` : `${n} 片合成`;
+  return `<article class="gcard tier-gift ${cls}" data-gift="${g.id}"${tilt ? ' data-tilt' : ''}>
+    <div class="gc-frame">
+      <header class="gc-head"><span class="gc-gem">${ic('gift')}</span><h3 class="gc-name">${esc(L.giftLabel(g, piece))}</h3></header>
+      ${giftArt(g, lit)}<span class="gc-rarity">${tag}</span></div>
+      <div class="gc-type"><span>老師禮物</span><span>${n === 1 ? '抽中即可換領' : `集齊 ${n} 片換領`}</span></div>
+      <p class="gc-text">${esc(g.note || (n === 1 ? `向老師換領「${g.name}」。` : `集齊 ${n} 張碎片，向老師換領「${g.name}」。`))}</p>
+      <footer class="gc-foot"><span>TEACHER GIFT</span><span>${piece != null && n > 1 ? `${piece + 1} / ${n}` : `× ${n}`}</span></footer>
+    </div>
+    <span class="gc-shine"></span>${piece != null && n > 1 ? `<span class="gc-piece">${piece + 1}/${n}</span>` : ''}${count ? `<span class="gc-count">×${count}</span>` : ''}
+  </article>`;
+}
+
+let state = L.createState();
+let undo = [];
+let me = null;
+let sync = null;
+let syncStatus = 'saved';
+const ui = { tab: 'class', modal: null, rolling: false, absentDraft: {}, filter: 'all', search: '', admin: null, giftEdit: null, pieces: 2 };
 let rng = Math.random;
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -72,13 +108,14 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const reduceMotion = () => !state.settings.animation || matchMedia('(prefers-reduced-motion: reduce)').matches;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const hue = (s) => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7);
+const persist = () => sync?.save(state, undo);
 const avatar = (s, size = '') => `<span class="avatar ${size}" style="--h:${hue(s.name)}">${esc([...s.name].slice(-2).join(''))}</span>`;
 
 function commit(next, label) {
   undo.push({ label, state });
   if (undo.length > UNDO_MAX) undo.shift();
   state = next;
-  save(state, undo);
+  persist();
   render();
 }
 
@@ -97,7 +134,7 @@ function doUndo() {
   if (!last) return toast('冇嘢可以復原');
   state = last.state;
   ui.modal = null;
-  save(state, undo);
+  persist();
   render();
   toast(`已復原：${last.label}`);
 }
@@ -117,23 +154,31 @@ function toast(msg, bad = false) {
 
 const cls = () => L.getClass(state);
 const stu = (id) => L.getStudent(state, id);
-const itemDots = (st) =>
-  ITEM_KEYS.filter((k) => st.items[k] > 0)
+const fragTotal = (st) => Object.values(st.frags || {}).reduce((n, a) => n + a.reduce((x, y) => x + y, 0), 0);
+const readyGifts = (st) => state.gifts.filter((g) => L.canRedeem(st, g));
+const itemDots = (st) => {
+  const f = fragTotal(st);
+  const ready = readyGifts(st).length;
+  return ITEM_KEYS.filter((k) => st.items[k] > 0)
     .map((k) => `<span class="dot tier-${ITEMS[k].tier}" title="${esc(ITEMS[k].name)} × ${st.items[k]}">${ic(ITEMS[k].glyph)}${st.items[k] > 1 ? `<b>${st.items[k]}</b>` : ''}</span>`)
-    .join('');
+    .join('') + (f ? `<span class="dot tier-gift${ready ? ' ready' : ''}" title="禮物碎片 ${f} 張${ready ? `，可換 ${ready} 份` : ''}">${ic('gift')}${f > 1 ? `<b>${f}</b>` : ''}</span>` : '');
+};
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 
 const TABS = [
   ['class', '課堂', 'grid'],
   ['cards', '道具圖鑑', 'layers'],
+  ['gifts', '禮物', 'gift'],
   ['students', '學生', 'users'],
   ['report', '報表', 'chart'],
   ['settings', '設定', 'sliders'],
+  ['admin', '老師帳戶', 'key', true],
 ];
-const TITLES = { class: ['課堂', '抽問、作答及道具'], cards: ['道具圖鑑', '四款技能卡'], students: ['學生', '名單、分數及背包'], report: ['報表', '成績與紀錄'], settings: ['設定', '規則、備份及測試資料'] };
+const TITLES = { class: ['課堂', '抽問、作答及道具'], cards: ['道具圖鑑', '四款技能卡'], gifts: ['禮物', '自訂獎賞及碎片收集'], students: ['學生', '名單、分數及背包'], report: ['報表', '成績與紀錄'], settings: ['設定', '規則、備份及測試資料'], admin: ['老師帳戶', '新增、停用及管理員權限'] };
+const SYNC_TEXT = { saved: ['cloud', '已儲存'], saving: ['cloud', '儲存中'], offline: ['cloudOff', '離線，稍後重試'], auth: ['lock', '請重新登入'] };
 
 function renderHeader() {
-  $('#tabs').innerHTML = TABS.map(([k, n, i]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}"${ui.tab === k ? ' aria-current="page"' : ''}>${ic(i)}<span>${n}</span></button>`).join('');
+  $('#tabs').innerHTML = TABS.filter((t) => !t[3] || me?.isAdmin).map(([k, n, i]) => `<button class="tab${ui.tab === k ? ' on' : ''}" data-act="tab" data-v="${k}"${ui.tab === k ? ' aria-current="page"' : ''}>${ic(i)}<span>${n}</span></button>`).join('');
   const c = cls();
   $('#sideFoot').innerHTML = c ? `<div class="side-class">${ic('users')}<div><b>${esc(c.name)}</b><small>${c.students.length} 位學生 · ${state.session ? '<i class="live-dot"></i>上課中' : '未上堂'}</small></div></div>` : '';
   const [t, sub] = TITLES[ui.tab];
@@ -149,12 +194,26 @@ function renderHeader() {
   btn.disabled = !undo.length;
   btn.title = undo.length ? `復原：${undo[undo.length - 1].label}` : '冇嘢可以復原';
   $('#fsBtn').innerHTML = ic('maximize');
+  renderSync();
+  const a = $('#acctBtn');
+  a.innerHTML = `<span class="avatar sm" style="--h:${hue(me?.name || '')}">${esc([...(me?.name || '?')].slice(-2).join(''))}</span><span class="acct-name">${esc(me?.name || '')}</span>`;
+  a.title = `${me?.name || ''}（${me?.username || ''}）`;
+}
+
+function renderSync() {
+  const el = $('#syncPill');
+  if (!el) return;
+  const [i, t] = SYNC_TEXT[syncStatus] || SYNC_TEXT.saved;
+  el.className = `sync-pill ${syncStatus}`;
+  el.innerHTML = `${ic(i)}<span>${t}</span>`;
+  el.title = syncStatus === 'saved' ? '資料已安全儲存在伺服器' : t;
 }
 
 function render() {
   renderHeader();
   const app = $('#app');
-  const views = { class: viewClass, cards: viewCards, students: viewStudents, report: viewReport, settings: viewSettings };
+  if (ui.tab === 'admin' && !me?.isAdmin) ui.tab = 'class';
+  const views = { class: viewClass, cards: viewCards, gifts: viewGifts, students: viewStudents, report: viewReport, settings: viewSettings, admin: viewAdmin };
   app.innerHTML = `<div class="view view-${ui.tab}">${views[ui.tab]()}</div>`;
   renderModal();
   filterRoster();
@@ -165,7 +224,7 @@ function viewCards() {
   return `<section class="cards-hero">
       <div><span class="kicker">${ic('sparkle')}技能卡收藏</span><h2 class="display">主動舉手答對，<br>即可抽一張技能卡。</h2>
       <p class="muted">站立同學答對可以坐低，但不抽卡。每人背包上限 ${state.settings.bagCap} 張，道具跨堂保留。</p></div>
-      <div class="odds">${ITEM_KEYS.map((k) => { const t = ITEM_KEYS.reduce((n, x) => n + state.settings.itemOdds[x], 0) || 1; const v = Math.round(state.settings.itemOdds[k] / t * 100); return `<div class="odd tier-${ITEMS[k].tier}"><span>${esc(ITEMS[k].name)}</span><i style="--v:${v}%"></i><b>${v}%</b></div>`; }).join('')}</div>
+      <div class="odds">${ITEM_KEYS.map((k) => { const t = L.giftOddsTotal(state) || 1; const v = Math.round(state.settings.itemOdds[k] / t * 100); return `<div class="odd tier-${ITEMS[k].tier}"><span>${esc(ITEMS[k].name)}</span><i style="--v:${v}%"></i><b>${v}%</b></div>`; }).join('')}${giftShare() ? `<div class="odd tier-gift"><span>老師禮物</span><i style="--v:${giftShare()}%"></i><b>${giftShare()}%</b></div>` : ''}</div>
     </section>
     <div class="deck">${ITEM_KEYS.map((k, i) => `<div class="deck-slot" style="--i:${i}">${gameCard(k, { cls: 'collectible' })}</div>`).join('')}</div>
     <section class="panel rules"><h3>公平遊戲約定</h3><ul>
@@ -184,7 +243,7 @@ function viewNewClass(intro = true) {
   return `<section class="welcome">
       <div class="welcome-copy"><span class="kicker">${ic('sparkle')}課堂答問管理</span>
         <h2 class="display">讓每一次舉手，<br>都變成一場冒險。</h2>
-        <p class="muted">抽人作答、站立挑戰、收集技能卡。所有資料只儲存在這部電腦。</p>
+        <p class="muted">抽人作答、站立挑戰、收集技能卡及老師禮物。資料安全儲存在你的老師帳戶。</p>
         <button class="btn primary xl" data-act="demo">${ic('play2')}一鍵體驗 · 12 人測試班</button>
         <div class="welcome-fan">${ITEM_KEYS.map((k, i) => `<div class="fan" style="--i:${i}">${gameCard(k, { tilt: false })}</div>`).join('')}</div>
       </div>
@@ -298,24 +357,163 @@ function viewReport() {
   return `<section class="panel"><div class="panel-head"><div><h2>${esc(c.name)} 成績</h2><p class="muted">共上了 ${sessions.length} 堂${state.session?.classId === c.id ? '（另有一堂進行中）' : ''}</p></div>
     <span class="row"><button class="btn primary" data-act="exportStats">${ic('download')}下載成績 (CSV)</button><button class="btn secondary" data-act="exportLogs">${ic('download')}下載紀錄 (CSV)</button></span></div>
     ${podium.length ? `<div class="podium">${podium.map((r, i) => `<div class="pod p${i + 1}">${avatar(r, 'lg')}<b>${esc(r.name)}</b><span>${r.score} 分</span><i>${i + 1}</i></div>`).join('')}</div>` : ''}
-    <div class="table-wrap"><table><thead><tr><th>#</th><th>座號</th><th>姓名</th><th>總分</th><th>答問</th><th>答對率</th><th>主動</th><th>被抽</th><th>罰站</th><th>道具 得/用</th><th>權重</th><th>背包</th></tr></thead><tbody>
+    <div class="table-wrap"><table><thead><tr><th>#</th><th>座號</th><th>姓名</th><th>總分</th><th>答問</th><th>答對率</th><th>主動</th><th>被抽</th><th>罰站</th><th>道具 得/用</th><th>碎片 得/換禮</th><th>權重</th><th>背包</th></tr></thead><tbody>
     ${rows.map((r, i) => `<tr><td>${i + 1}</td><td>${esc(r.no)}</td><td>${esc(r.name)}</td><td><b>${r.score}</b></td><td>${r.answered}</td><td>${r.answered ? Math.round((r.correct / r.answered) * 100) + '%' : '—'}</td>
-      <td>${r.volunteerCorrect}/${r.volunteer}</td><td>${r.drawnCorrect}/${r.drawn}</td><td>${r.stood}</td><td>${r.itemsGot}/${r.itemsUsed}</td><td>${r.weight}</td><td><span class="chips">${itemDots(r) || '—'}</span></td></tr>`).join('')}
+      <td>${r.volunteerCorrect}/${r.volunteer}</td><td>${r.drawnCorrect}/${r.drawn}</td><td>${r.stood}</td><td>${r.itemsGot}/${r.itemsUsed}</td><td>${r.giftsGot}/${r.redeemed}</td><td>${r.weight}</td><td><span class="chips">${itemDots(r) || '—'}</span></td></tr>`).join('')}
     </tbody></table></div><p class="muted small">「主動」「被抽」顯示 答對/次數。</p></section>
     <section class="panel"><h3>最近紀錄</h3>${logs.length ? `<ol class="log">${logs.map((e) => `<li class="${e.type === 'answer' ? (e.correct ? 'ok' : 'no') : 'item'}"><time>${new Date(e.at).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</time><span>${esc(L.describeLog(e))}</span></li>`).join('')}</ol>` : '<p class="muted">未有紀錄</p>'}</section>`;
+}
+
+function giftShare() {
+  const t = L.giftOddsTotal(state);
+  if (!t) return 0;
+  return Math.round((state.gifts.filter((g) => g.stock !== 0).reduce((n, g) => n + g.odds, 0) / t) * 100);
+}
+
+function pieceStrip(g, lit = () => true) {
+  return `<span class="piece-strip" style="--n:${g.pieces};--gh:${hue(g.name) % 80 - 40}deg">${Array.from({ length: g.pieces }, (_, i) => `<span class="${lit(i) ? 'on' : 'off'}" style="--px:${g.pieces > 1 ? (i / (g.pieces - 1)) * 100 : 50}%"><b>${g.pieces > 1 ? `${i + 1}/${g.pieces}` : '完整'}</b></span>`).join('')}</span>`;
+}
+
+function fragTrack(g, counts) {
+  const have = counts.filter(Boolean).length;
+  return `<div class="frag-track"><div class="frag-head"><span>${ic('puzzle')}${esc(g.name)}</span><b>${have} / ${g.pieces} 片</b></div>${pieceStrip(g, (i) => counts[i] > 0)}${counts.some((n) => n > 1) ? `<p class="muted small">重複：${counts.map((n, i) => (n > 1 ? `${i + 1}/${g.pieces} ×${n}` : '')).filter(Boolean).join('、')}</p>` : ''}</div>`;
+}
+
+function giftPreview(g) {
+  return `${giftCard(g, { tilt: false })}${g.pieces > 1 ? `<p class="muted small center">同學會抽到：${Array.from({ length: g.pieces }, (_, i) => `「${esc(g.name)} ${i + 1}/${g.pieces}」`).join('、')}</p>` : ''}`;
+}
+
+function sheetGifts(s) {
+  if (!state.gifts.length) return '';
+  const rows = state.gifts
+    .map((g) => {
+      const c = L.fragCounts(s, g);
+      if (!ui.fragEdit && !c.some(Boolean)) return '';
+      const ready = L.canRedeem(s, g);
+      return `<div class="gift-row${ready ? ' ready' : ''}">
+        <div class="gift-row-main"><b>${esc(g.name)}</b>${pieceStrip(g, (i) => c[i] > 0)}</div>
+        ${ui.fragEdit ? `<div class="frag-edit">${c.map((n, i) => `<span><button type="button" class="btn icon-btn sm" data-act="fragAdj" data-gift="${g.id}" data-piece="${i}" data-d="-1" aria-label="減少 ${esc(L.giftLabel(g, i))}" ${n ? '' : 'disabled'}>${ic('minus')}</button><i>${g.pieces > 1 ? `${i + 1}/${g.pieces}` : '完整'} ×${n}</i><button type="button" class="btn icon-btn sm" data-act="fragAdj" data-gift="${g.id}" data-piece="${i}" data-d="1" aria-label="增加 ${esc(L.giftLabel(g, i))}">${ic('plus')}</button></span>`).join('')}</div>`
+        : ready ? `<button class="btn gold sm" data-act="redeem" data-id="${s.id}" data-gift="${g.id}">${ic('gift')}換領</button>` : `<span class="muted small">${c.filter(Boolean).length}/${g.pieces}</span>`}
+      </div>`;
+    })
+    .join('');
+  return `<div class="sub-row"><h3 class="sub">禮物碎片</h3><button type="button" class="btn ghost sm" data-act="toggleFragEdit">${ic('edit')}${ui.fragEdit ? '完成調整' : '老師調整'}</button></div>
+    <div class="gift-rows">${rows || '<p class="muted small">未有禮物碎片。主動舉手答對就有機會抽到。</p>'}</div>`;
+}
+
+function giftCounts(g) {
+  let given = 0;
+  let redeemed = 0;
+  for (const e of state.logs) {
+    if (e.giftId !== g.id) continue;
+    if (e.type === 'answer') given++;
+    else if (e.type === 'redeem') redeemed++;
+  }
+  return { given, redeemed };
+}
+
+const SAMPLE_GIFT = { id: 'sample', name: '珍珠奶茶', pieces: 2, note: '' };
+
+function viewGifts() {
+  const c = cls();
+  const total = L.giftOddsTotal(state) || 1;
+  const ready = c ? c.students.flatMap((st) => readyGifts(st).map((g) => ({ st, g }))) : [];
+  const collecting = c ? c.students.filter((st) => fragTotal(st) > 0) : [];
+  const shelf = state.gifts
+    .map((g, i) => {
+      const { given, redeemed } = giftCounts(g);
+      const chance = g.stock === 0 ? 0 : (g.odds / total) * 100;
+      return `<article class="gift-item" style="--i:${i}"><div class="gift-item-card">${giftCard(g)}</div>
+        <div class="gift-item-body"><div><h3>${esc(g.name)}</h3><p class="muted small">${g.pieces === 1 ? '抽中即可換領' : `分成 ${g.pieces} 張碎片，集齊先可以換`}</p></div>
+          ${pieceStrip(g)}
+          <dl class="gift-stats"><div><dt>抽中機會</dt><dd>${chance ? `${chance < 1 ? chance.toFixed(1) : Math.round(chance)}%` : '暫停'}</dd></div><div><dt>尚餘</dt><dd>${g.stock == null ? '不限' : `${g.stock} 份`}</dd></div><div><dt>已派出</dt><dd>${given}</dd></div><div><dt>已換領</dt><dd>${redeemed}</dd></div></dl>
+          <div class="row"><button class="btn secondary sm" data-act="editGift" data-gift="${g.id}">${ic('edit')}編輯</button><button class="btn danger-ghost sm" data-act="deleteGift" data-gift="${g.id}">${ic('trash')}刪除</button></div>
+        </div></article>`;
+    })
+    .join('');
+  return `<section class="gifts-hero">
+      <div class="gifts-hero-copy"><span class="kicker">${ic('gift')}老師禮物</span><h2 class="display">把真實獎賞，<br>變成要收集的卡。</h2>
+        <p class="muted">主動舉手答對時，除咗技能卡，亦有機會抽中你設定的禮物。每份禮物可以拆成 1 至 4 張碎片，例如「珍珠奶茶」分 2 張，同學要集齊「1/2」同「2/2」先可以換。碎片唔佔背包位置。</p>
+        <div class="row wrap"><button class="btn primary" data-act="newGift">${ic('plus')}新增禮物</button><span class="chip">每次答對抽中禮物：<b>${giftShare()}%</b></span></div></div>
+      <div class="gifts-hero-art">${state.gifts.length > 1 ? `<div class="fan" style="--i:0">${giftCard(state.gifts[1], { tilt: false, piece: state.gifts[1].pieces > 1 ? 1 : null })}</div>` : ''}<div class="fan" style="--i:1">${giftCard(state.gifts[0] || SAMPLE_GIFT, { tilt: false, piece: (state.gifts[0] || SAMPLE_GIFT).pieces > 1 ? 0 : null })}</div></div>
+    </section>
+    ${ready.length ? `<section class="panel ready-panel"><div class="panel-head"><div><h3>${ic('sparkle')}${esc(c.name)} · 可以換領</h3><p class="muted">以下同學已集齊碎片，換領後記得實際交禮物。</p></div></div>
+      <div class="ready-list">${ready.map(({ st, g }) => `<div class="ready-row">${avatar(st)}<span class="nm">${esc(st.name)}</span><span class="ready-gift">${ic('gift')}${esc(g.name)}</span><button class="btn gold sm" data-act="redeem" data-id="${st.id}" data-gift="${g.id}">換領</button></div>`).join('')}</div></section>` : ''}
+    ${state.gifts.length ? `<section class="gift-shelf">${shelf}</section>` : `<section class="panel empty"><h3>未有禮物</h3><p class="muted">按「新增禮物」加入第一份獎賞，例如珍珠奶茶、免一次功課、當一日小老師。</p></section>`}
+    ${c && collecting.length && state.gifts.length ? `<section class="panel"><h3>${esc(c.name)} 收集進度</h3><div class="collect-list">${collecting.map((st) => `<div class="collect-row">${avatar(st)}<span class="nm">${esc(st.name)}</span><span class="collect-gifts">${state.gifts.filter((g) => L.fragCounts(st, g).some(Boolean)).map((g) => `<span class="collect-gift"><small>${esc(g.name)}</small>${pieceStrip(g, (i) => L.fragCounts(st, g)[i] > 0)}</span>`).join('')}</span></div>`).join('')}</div></section>` : ''}`;
+}
+
+const genPassword = () => {
+  const a = 'abcdefghjkmnpqrstuvwxyz23456789';
+  const r = crypto.getRandomValues(new Uint8Array(10));
+  return [...r].map((x) => a[x % a.length]).join('');
+};
+
+let adminLoading = false;
+async function loadAdmin() {
+  if (adminLoading) return;
+  adminLoading = true;
+  try {
+    ui.admin = (await api('GET', '/api/admin/users')).users;
+    if (ui.tab === 'admin') render();
+  } catch (e) {
+    toast(e.message, true);
+  } finally {
+    adminLoading = false;
+  }
+}
+
+async function adminCall(method, id, body, okMsg) {
+  try {
+    const r = await api(method, `/api/admin/users/${id}`, body);
+    if (okMsg) toast(okMsg);
+    await loadAdmin();
+    return r;
+  } catch (e) {
+    toast(e.message, true);
+    return null;
+  }
+}
+
+function viewAdmin() {
+  if (!ui.admin) {
+    loadAdmin();
+    return `<section class="panel"><p class="muted">載入老師帳戶…</p></section>`;
+  }
+  const list = ui.admin;
+  const fmt = (t) => new Date(t).toLocaleString('zh-HK', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `<div class="admin-grid">
+    <section class="panel"><div class="panel-head"><div><h2>老師帳戶</h2><p class="muted">共 ${list.length} 個帳戶 · 管理員 ${list.filter((u) => u.isAdmin && !u.disabled).length} 位。每位老師的班別、學生及禮物各自獨立。</p></div></div>
+      <div class="acct-list">${list.map((u) => `<div class="acct-row${u.disabled ? ' off' : ''}" data-user="${esc(u.username)}">${avatar(u)}
+        <div class="acct-info"><b>${esc(u.name)}${u.isAdmin ? `<span class="role admin">${ic('crown')}管理員</span>` : '<span class="role">老師</span>'}${u.disabled ? '<span class="role off">已停用</span>' : ''}${u.mustChange ? '<span class="role warn">待改密碼</span>' : ''}</b>
+          <small>${esc(u.username)} · ${u.classes} 班 · ${u.students} 位學生 · ${u.lastLogin ? `上次登入 ${fmt(u.lastLogin)}` : '未登入過'}</small></div>
+        <div class="row wrap acct-actions">
+          ${u.id !== me.id ? `<button class="btn sm secondary" data-act="adminToggleAdmin" data-id="${u.id}">${u.isAdmin ? '取消管理員' : '設為管理員'}</button>` : '<span class="chip">你自己</span>'}
+          <button class="btn sm secondary" data-act="adminReset" data-id="${u.id}">${ic('key')}重設密碼</button>
+          ${u.id !== me.id ? `<button class="btn sm secondary" data-act="adminToggleDisabled" data-id="${u.id}">${u.disabled ? '重新啟用' : '停用'}</button><button class="btn sm danger-ghost" data-act="adminDelete" data-id="${u.id}" aria-label="刪除 ${esc(u.name)}">${ic('trash')}刪除</button>` : ''}
+        </div></div>`).join('')}</div></section>
+    <section class="panel"><h3>新增老師</h3><form data-form="addTeacher" class="stack" autocomplete="off">
+      <label class="field"><span>顯示名稱</span><input name="name" required maxlength="30" placeholder="例如：陳老師"></label>
+      <label class="field"><span>登入名稱（英文小寫、數字、點）</span><input name="username" required pattern="[a-z0-9][a-z0-9._\-]{1,31}" placeholder="例如：miss.chan" autocapitalize="off" spellcheck="false"></label>
+      <label class="field"><span>臨時密碼（最少 8 字）</span><span class="input-row"><input name="password" required minlength="8" value="${genPassword()}" spellcheck="false"><button type="button" class="btn secondary icon-btn" data-act="regenPw" aria-label="重新產生密碼" title="重新產生">${ic('refresh')}</button></span></label>
+      <label class="switch"><input type="checkbox" name="isAdmin"><i></i><span>同時是管理員（可以加減老師）</span></label>
+      <p class="muted small">新老師第一次登入時要自行改密碼。</p>
+      <button class="btn primary">${ic('plus')}新增老師</button></form></section>
+  </div>`;
 }
 
 function viewSettings() {
   const s = state.settings;
   const num = (name, val, label, extra = '') => `<label class="field"><span>${label}</span><input type="number" name="${name}" value="${val}" ${extra}></label>`;
   const sw = (name, on, label) => `<label class="switch"><input type="checkbox" name="${name}" ${on ? 'checked' : ''}><i></i><span>${label}</span></label>`;
-  const oddsTotal = ITEM_KEYS.reduce((n, k) => n + s.itemOdds[k], 0) || 1;
+  const oddsTotal = L.giftOddsTotal(state) || 1;
   return `<form data-form="settings" class="settings">
     <section class="panel"><h3>計分</h3><div class="form-grid">
       ${num('score.volunteer', s.score.volunteer, '主動舉手答對')}${num('score.drawn', s.score.drawn, '被抽中答對')}
       ${num('score.designated', s.score.designated, '被指定代答答對')}${num('score.standing', s.score.standing, '站立者舉手答對')}</div></section>
     <section class="panel"><h3>道具機率（主動答對時抽）</h3><div class="form-grid">
-      ${ITEM_KEYS.map((k) => num(`itemOdds.${k}`, s.itemOdds[k], `${ITEMS[k].name}（目前 ${Math.round((s.itemOdds[k] / oddsTotal) * 100)}%）`, 'min="0"')).join('')}</div></section>
+      ${ITEM_KEYS.map((k) => num(`itemOdds.${k}`, s.itemOdds[k], `${ITEMS[k].name}（目前 ${Math.round((s.itemOdds[k] / oddsTotal) * 100)}%）`, 'min="0"')).join('')}</div>
+      <p class="muted small">數字係相對比重，會同「禮物」頁每份禮物的比重一齊計。</p></section>
     <section class="panel"><h3>抽中權重</h3><div class="form-grid">
       ${num('baseWeight', s.baseWeight, '新學生預設權重', 'min="1"')}${num('weightStep', s.weightStep, '每張機率卡加/減', 'min="0"')}
       ${num('minWeight', s.minWeight, '最低權重', 'min="1"')}${num('maxWeight', s.maxWeight, '最高權重', 'min="1"')}</div></section>
@@ -323,7 +521,7 @@ function viewSettings() {
       ${num('bagCap', s.bagCap, '背包上限（張）', 'min="0"')}${num('antiRepeatCount', s.antiRepeatCount, '防連抽：答完後幾多題內機率減半', 'min="1"')}</div>
       <div class="switches">${sw('antiRepeat', s.antiRepeat, '開啟防連抽')}${sw('showOdds', s.showOdds, '課堂畫面顯示抽中機率')}${sw('animation', s.animation, '抽人及卡牌動畫')}</div></section>
     <div class="sticky-save"><button class="btn primary">${ic('check')}儲存設定</button></div></form>
-    <section class="panel"><h3>資料備份與試玩</h3><p class="muted">資料只儲存在這部電腦的瀏覽器。換機或清除瀏覽器資料前，請先下載備份。</p>
+    <section class="panel"><h3>資料備份與試玩</h3><p class="muted">資料儲存在你的老師帳戶，任何電腦登入都會見到；每位老師的資料互不相通。舊版（只存在瀏覽器）的備份可以用「還原備份」匯入。</p>
       <div class="row wrap"><button type="button" class="btn secondary" data-act="demo">${ic('plus')}新增 12 人測試班（保留現有班別）</button>
       <button class="btn secondary" data-act="backup">${ic('download')}下載備份</button>
       <label class="btn secondary file">${ic('upload')}還原備份<input type="file" accept="application/json,.json" data-act="restore" hidden></label>
@@ -375,6 +573,14 @@ function modalBody(m) {
   }
   if (m.type === 'reward') {
     const s = stu(m.id);
+    const g = m.gift && L.getGift(state, m.gift.giftId);
+    if (g) {
+      const ready = L.canRedeem(s, g);
+      return `<div class="reward"><h2>${esc(s.name)} 答對！+${m.points} 分</h2><p class="muted">${g.pieces > 1 ? '抽中老師禮物碎片' : '抽中老師禮物'}</p>
+        <div class="card-flip gift-flip${reduceMotion() ? ' instant' : ''}"><div class="flip-inner"><div class="face back"><span class="back-logo"></span></div><div class="face front">${giftCard(g, { piece: g.pieces > 1 ? m.gift.piece : null, tilt: false })}</div></div><span class="burst"></span></div>
+        ${g.pieces > 1 ? fragTrack(g, L.fragCounts(s, g)) : ''}
+        <div class="m-foot center">${ready ? `<button class="btn gold xl" data-act="redeem" data-id="${s.id}" data-gift="${g.id}">${ic('gift')}${g.pieces > 1 ? '集齊！' : ''}即刻換領</button>` : ''}<button class="btn primary xl" data-act="closeModal">好</button></div></div>`;
+    }
     if (m.item) {
       return `<div class="reward"><h2>${esc(s.name)} 答對！+${m.points} 分</h2><p class="muted">獲得一張技能卡</p>
         <div class="card-flip${reduceMotion() ? ' instant' : ''}"><div class="flip-inner"><div class="face back"><span class="back-logo"></span></div><div class="face front">${gameCard(m.item, { tilt: false })}</div></div><span class="burst"></span></div>
@@ -413,6 +619,7 @@ function modalBody(m) {
         <button class="btn card-btn tier-legend" data-act="chooseUp" ${s.items.up > 0 && !busy ? '' : 'disabled'}>${ic('up')}用調高卡</button>
       </div>
       <p class="muted small">免答卡及指定同學卡會在被抽中時出現。</p>
+      ${sheetGifts(s)}
       <h3 class="sub">老師操作</h3><div class="row wrap">
         ${status !== 'absent' ? `<button class="btn secondary" data-act="toggleStand">${status === 'standing' ? '設為坐低' : '設為站立'}</button>` : ''}
         <button class="btn secondary" data-act="toggleAbsent">${status === 'absent' ? '標示出席' : '標示缺席'}</button></div>
@@ -430,6 +637,38 @@ function modalBody(m) {
     return `<div class="confirm-up">${gameCard('up', { cls: 'mini', tilt: false })}<div><h2>老師確認</h2><p class="big-msg">${esc(s.name)} 想用調高卡，將 <b>${esc(t.name)}</b> 的抽中權重由 ${t.weight} 調高到 ${after}。</p>
       <p class="muted">如果覺得係針對同學，可以否決（卡會保留）。</p></div></div>
       <div class="answer"><button class="btn ok xl" data-act="confirmUp">${ic('check')}批准</button><button class="btn no xl" data-act="vetoUp">${ic('x')}否決</button></div>`;
+  }
+  if (m.type === 'giftEdit') {
+    const g = m.id ? L.getGift(state, m.id) : { name: '', pieces: 2, odds: 10, stock: null, note: '' };
+    const pieces = m.pieces ?? g.pieces;
+    return `<form data-form="giftForm" class="stack"><div class="m-head"><span class="m-ic gift">${ic('gift')}</span><div><h2>${m.id ? '編輯禮物' : '新增禮物'}</h2><p class="muted">同學主動舉手答對時有機會抽中。</p></div></div>
+      <div class="gift-form">
+        <div class="stack">
+          <label class="field"><span>禮物名稱</span><input name="name" required maxlength="24" value="${esc(g.name)}" placeholder="例如：珍珠奶茶"></label>
+          <fieldset class="field"><legend>分成幾張碎片</legend><div class="seg pieces-seg">${[1, 2, 3, 4].map((n) => `<label><input type="radio" name="pieces" value="${n}" ${n === pieces ? 'checked' : ''}><span>${n === 1 ? '1 張（完整）' : `${n} 張`}</span></label>`).join('')}</div></fieldset>
+          <div class="form-grid"><label class="field"><span>抽中比重</span><input type="number" name="odds" min="0" value="${g.odds}"></label>
+          <label class="field"><span>可換份數（留空＝不限）</span><input type="number" name="stock" min="0" value="${g.stock ?? ''}" placeholder="不限"></label></div>
+          <label class="field"><span>卡面說明（可選）</span><input name="note" maxlength="60" value="${esc(g.note || '')}" placeholder="例如：小息到教員室找陳老師換領"></label>
+          <p class="muted small">比重會同四款技能卡一齊計：技能卡現時合共 ${ITEM_KEYS.reduce((n, k) => n + state.settings.itemOdds[k], 0)}。碎片隨機派發，唔佔背包位置。</p>
+        </div>
+        <div class="gift-preview" id="giftPreview">${giftPreview({ ...g, id: 'preview', name: g.name || '禮物名稱', pieces })}</div>
+      </div>
+      <div class="m-foot"><button type="button" class="btn secondary" data-act="closeModal">取消</button><button class="btn primary">${ic('check')}${m.id ? '儲存' : '新增禮物'}</button></div></form>`;
+  }
+  if (m.type === 'account') {
+    return `<div class="sheet-head">${avatar(me, 'lg')}<div><h2>${esc(me.name)}</h2><p class="sheet-stats"><span>登入名稱：<b>${esc(me.username)}</b></span><span>身份：<b>${me.isAdmin ? '老師 · 管理員' : '老師'}</b></span></p></div></div>
+      <form data-form="accountName" class="inline-form"><label class="field"><span>顯示名稱</span><input name="name" required maxlength="30" value="${esc(me.name)}"></label><button class="btn secondary">${ic('check')}儲存</button></form>
+      <form data-form="accountPassword" class="stack"><h3 class="sub">更改密碼</h3>
+        <div class="form-grid three"><label class="field"><span>現有密碼</span><input name="current" type="password" required autocomplete="current-password"></label>
+        <label class="field"><span>新密碼（最少 8 字）</span><input name="next" type="password" required minlength="8" autocomplete="new-password"></label>
+        <label class="field"><span>再輸入新密碼</span><input name="confirm" type="password" required minlength="8" autocomplete="new-password"></label></div>
+        <div><button class="btn secondary">${ic('key')}更改密碼</button></div></form>
+      <div class="m-foot">${me.isAdmin ? `<button class="btn ghost" data-act="tab" data-v="admin">${ic('key')}管理老師帳戶</button>` : ''}<button class="btn danger-ghost" data-act="logout">${ic('logout')}登出</button><button class="btn secondary" data-act="closeModal">關閉</button></div>`;
+  }
+  if (m.type === 'cred') {
+    return `<div class="m-head"><span class="m-ic ok">${ic('check')}</span><div><h2>${esc(m.title)}</h2><p class="muted">請將以下資料交給${esc(m.name)}。第一次登入時要自行更改密碼。</p></div></div>
+      <dl class="cred"><div><dt>網址</dt><dd>${esc(location.origin)}/</dd></div><div><dt>登入名稱</dt><dd>${esc(m.username)}</dd></div><div><dt>臨時密碼</dt><dd>${esc(m.password)}</dd></div></dl>
+      <div class="m-foot"><button class="btn secondary" data-act="copyCred">${ic('copy')}複製</button><button class="btn primary" data-act="closeModal">完成</button></div>`;
   }
   if (m.type === 'confirm') {
     return `<h2>${esc(m.title)}</h2><p class="confirm-body">${m.html}</p><div class="m-foot">${m.single ? '' : '<button class="btn secondary" data-act="closeModal">取消</button>'}<button class="btn ${m.danger ? 'danger' : 'primary'}" data-act="confirmYes">${esc(m.yes || '確定')}</button></div>`;
@@ -483,7 +722,7 @@ function cardFx(k, caption) {
   setTimeout(() => node.remove(), 2100);
 }
 
-const TIER_COLORS = { rare: ['#22d3ee', '#a5f3fc'], epic: ['#f59e0b', '#fde68a'], fine: ['#10b981', '#a7f3d0'], legend: ['#ec4899', '#f0abfc'], base: ['#6366f1', '#f59e0b', '#10b981', '#ec4899'] };
+const TIER_COLORS = { gift: ['#fde68a', '#f59e0b', '#2dd4bf'], rare: ['#22d3ee', '#a5f3fc'], epic: ['#f59e0b', '#fde68a'], fine: ['#10b981', '#a7f3d0'], legend: ['#ec4899', '#f0abfc'], base: ['#6366f1', '#f59e0b', '#10b981', '#ec4899'] };
 function burst(el, n = 20, tier = 'base') {
   if (!el || reduceMotion()) return;
   const r = el.getBoundingClientRect();
@@ -569,7 +808,13 @@ function filterRoster() {
   if (!visible) grid.insertAdjacentHTML('beforeend', '<p class="empty-roster">沒有符合的同學。試試其他姓名或狀態。</p>');
 }
 
+function updateGiftPreview(f) {
+  const pieces = +(f.querySelector('input[name=pieces]:checked')?.value || 1);
+  $('#giftPreview').innerHTML = giftPreview({ id: 'preview', name: f.elements.name.value.trim() || '禮物名稱', pieces, note: f.elements.note.value.trim() });
+}
+
 document.addEventListener('input', (ev) => {
+  if (ev.target.closest?.('form[data-form=giftForm]') && ev.target.type !== 'radio') return updateGiftPreview(ev.target.closest('form'));
   if (ev.target.id === 'rosterSearch') {
     ui.search = ev.target.value;
     filterRoster();
@@ -585,7 +830,7 @@ const actions = {
     if (attempt(addDemo, '建立測試班')) {
       ui.tab = 'class';
       render();
-      toast('12 位虛構學生已加入，每人有四種道具各一張');
+      toast('已加入 12 位虛構學生（每人四種道具）及 3 份測試禮物');
     }
   },
   fullscreen: async () => {
@@ -625,8 +870,10 @@ const actions = {
     if (!correct) msg = wasStanding ? '繼續站住，下次再試！' : '冇關係，主動舉手答錯冇懲罰。';
     else if (wasStanding) msg = '可以坐返低。';
     else if (e.bagFull) msg = `背包已滿（${state.settings.bagCap} 張），今次冇抽卡。`;
-    openModal({ type: 'reward', id, item: e.item, points: e.points, correct, msg });
-    if (correct && !reduceMotion()) setTimeout(() => burst($(e.item ? '.modal .card-flip' : '.modal .result-ic'), e.item ? 34 : 18, e.item ? ITEMS[e.item].tier : 'base'), e.item ? 650 : 120);
+    const gift = e.giftId ? { giftId: e.giftId, piece: e.piece, pieces: e.pieces } : null;
+    openModal({ type: 'reward', id, item: e.item, gift, points: e.points, correct, msg });
+    const card = e.item || gift;
+    if (correct && !reduceMotion()) setTimeout(() => burst($(card ? '.modal .card-flip' : '.modal .result-ic'), card ? 34 : 18, e.item ? ITEMS[e.item].tier : gift ? 'gift' : 'base'), card ? 650 : 120);
   },
   draw: () => startDraw(),
   drawResult: (el) => {
@@ -691,7 +938,7 @@ const actions = {
   pickClass: (el) => {
     if (state.session) return toast('上緊堂，落堂先可以轉班', true);
     state.activeClassId = el.dataset.id;
-    save(state, undo);
+    persist();
     render();
   },
   renameClass: (el) => {
@@ -714,6 +961,78 @@ const actions = {
     downloadFile(`${c.name}-紀錄-${today()}.csv`, L.toCSV(rows), 'text/csv;charset=utf-8');
   },
   backup: () => downloadFile(`課堂冒險局-備份-${today()}.json`, JSON.stringify(state, null, 1), 'application/json'),
+  account: () => openModal({ type: 'account' }),
+  logout: async () => {
+    if (sync?.dirty) await sync.flushNow();
+    try {
+      await api('POST', '/api/logout');
+    } catch {}
+    location.reload();
+  },
+  retryBoot: () => boot(),
+  gateLogout: async () => {
+    try {
+      await api('POST', '/api/logout');
+    } catch {}
+    location.reload();
+  },
+  legacyDownload: () => downloadFile(`課堂冒險局-舊版資料-${today()}.json`, legacyBackup() || '{}', 'application/json'),
+  newGift: () => openModal({ type: 'giftEdit', id: null }),
+  editGift: (el) => openModal({ type: 'giftEdit', id: el.dataset.gift }),
+  deleteGift: (el) => {
+    const g = L.getGift(state, el.dataset.gift);
+    confirmBox(`刪除「${g.name}」？`, '所有同學手上這份禮物的碎片都會一併刪除。可以按「復原」救返。', () => attempt((s) => L.removeGift(s, g.id), `刪除禮物 ${g.name}`), { yes: '刪除', danger: true });
+  },
+  redeem: (el) => {
+    const st = stu(el.dataset.id);
+    const g = L.getGift(state, el.dataset.gift);
+    const back = ui.modal?.type === 'sheet' ? ui.modal.id : null;
+    confirmBox(`換領「${g.name}」？`, `${esc(st.name)} 已${g.pieces > 1 ? `集齊 ${g.pieces} 張碎片` : '抽中這份禮物'}。換領後會扣除${g.pieces > 1 ? '一套碎片' : '這張卡'}${g.stock != null ? `，禮物尚餘 ${g.stock - 1} 份` : ''}。記得實際交禮物給同學。`, () => {
+      if (attempt((s) => L.redeemGift(s, st.id, g.id), `${st.name} 換領 ${g.name}`)) {
+        if (back) openModal({ type: 'sheet', id: back });
+        redeemFx(L.getGift(state, g.id) || g, `${st.name} 換領「${g.name}」`);
+        toast(`${st.name} 換領咗「${g.name}」`);
+      }
+    }, { yes: '換領' });
+  },
+  toggleFragEdit: () => { ui.fragEdit = !ui.fragEdit; renderModal(); },
+  fragAdj: (el) => {
+    const id = ui.modal.id;
+    const g = L.getGift(state, el.dataset.gift);
+    const d = +el.dataset.d;
+    attempt((s) => L.adjustFrag(s, id, g.id, +el.dataset.piece, d), `${d > 0 ? '加' : '減'} ${stu(id).name} 的禮物碎片`);
+  },
+  regenPw: (el) => { el.closest('form').password.value = genPassword(); },
+  adminToggleAdmin: (el) => {
+    const u = ui.admin.find((x) => x.id === el.dataset.id);
+    adminCall('PATCH', u.id, { isAdmin: !u.isAdmin }, u.isAdmin ? `${u.name} 已取消管理員` : `${u.name} 已設為管理員`);
+  },
+  adminToggleDisabled: (el) => {
+    const u = ui.admin.find((x) => x.id === el.dataset.id);
+    if (u.disabled) return adminCall('PATCH', u.id, { disabled: false }, `${u.name} 已重新啟用`);
+    confirmBox(`停用 ${u.name}？`, '停用後佢會即時被登出，不能再登入；資料會保留，可以隨時重新啟用。', () => adminCall('PATCH', u.id, { disabled: true }, `${u.name} 已停用`), { yes: '停用', danger: true });
+  },
+  adminReset: (el) => {
+    const u = ui.admin.find((x) => x.id === el.dataset.id);
+    const pw = genPassword();
+    confirmBox(`重設 ${u.name} 的密碼？`, '會產生一個新的臨時密碼，佢現有的登入會失效，下次登入要再改密碼。', async () => {
+      if (await adminCall('PATCH', u.id, { password: pw }, '已重設密碼')) openModal({ type: 'cred', title: '已重設密碼', name: u.name, username: u.username, password: pw });
+    }, { yes: '重設' });
+  },
+  adminDelete: (el) => {
+    const u = ui.admin.find((x) => x.id === el.dataset.id);
+    confirmBox(`刪除 ${u.name}？`, `帳戶會被刪除，佢的 ${u.classes} 班資料會移到伺服器封存（不會即時永久刪除）。如果只是暫時唔用，建議改用「停用」。`, () => adminCall('DELETE', u.id, undefined, `已刪除 ${u.name}`), { yes: '刪除帳戶', danger: true });
+  },
+  copyCred: async () => {
+    const m = ui.modal;
+    const text = `課堂冒險局\n網址：${location.origin}/\n登入名稱：${m.username}\n臨時密碼：${m.password}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('已複製');
+    } catch {
+      toast('未能自動複製，請手動抄低', true);
+    }
+  },
   wipe: () => confirmBox('清除全部資料？', '所有班別、學生、分數同紀錄都會刪除。建議先下載備份。（仍可以按「復原」一次救返）', () => commit(L.createState(), '清除全部資料'), { yes: '全部清除', danger: true }),
 };
 
@@ -806,6 +1125,34 @@ document.addEventListener('submit', (ev) => {
     }
     for (const k of ['antiRepeat', 'showOdds', 'animation']) patch[k] = fd.has(k);
     if (attempt((s) => L.updateSettings(s, patch), '更改設定')) toast('設定已儲存');
+  } else if (kind === 'login') {
+    doLogin(form, fd);
+  } else if (kind === 'firstPassword') {
+    doFirstPassword(form, fd);
+  } else if (kind === 'giftForm') {
+    const input = { name: fd.get('name'), pieces: +fd.get('pieces'), odds: fd.get('odds'), stock: fd.get('stock'), note: fd.get('note') };
+    const id = ui.modal.id;
+    if (attempt((s) => (id ? L.updateGift(s, id, input) : L.addGift(s, input)), `${id ? '編輯' : '新增'}禮物 ${input.name}`)) {
+      openModal(null);
+      toast(id ? '禮物已更新' : `已新增「${String(input.name).trim()}」`);
+    }
+  } else if (kind === 'accountName') {
+    api('POST', '/api/profile', { name: fd.get('name') })
+      .then((r) => { me = r.user; ui.admin = null; render(); toast('顯示名稱已更新'); })
+      .catch((e) => toast(e.message, true));
+  } else if (kind === 'accountPassword') {
+    if (fd.get('next') !== fd.get('confirm')) return toast('兩次輸入的新密碼不一樣', true);
+    api('POST', '/api/password', { current: fd.get('current'), next: fd.get('next') })
+      .then(() => { form.reset(); toast('密碼已更改，其他裝置會被登出'); })
+      .catch((e) => toast(e.message, true));
+  } else if (kind === 'addTeacher') {
+    const body = { name: fd.get('name'), username: String(fd.get('username')).trim().toLowerCase(), password: fd.get('password'), isAdmin: fd.has('isAdmin') };
+    api('POST', '/api/admin/users', body)
+      .then(async (r) => {
+        await loadAdmin();
+        openModal({ type: 'cred', title: `已新增 ${r.user.name}`, name: r.user.name, username: r.user.username, password: body.password });
+      })
+      .catch((e) => toast(e.message, true));
   } else if (kind === 'prompt') {
     ui.modal.onSubmit(fd.get('v'));
   }
@@ -813,9 +1160,10 @@ document.addEventListener('submit', (ev) => {
 
 document.addEventListener('change', (ev) => {
   const t = ev.target;
+  if (t.closest?.('form[data-form=giftForm]')) return updateGiftPreview(t.closest('form'));
   if (t.id === 'classSelect') {
     state.activeClassId = t.value;
-    save(state, undo);
+    persist();
     return render();
   }
   if (t.dataset.act === 'restore') {
@@ -845,12 +1193,183 @@ $('#undoBtn').addEventListener('click', () => {
   doUndo();
 });
 
+function redeemFx(g, caption) {
+  if (reduceMotion()) return;
+  const node = document.createElement('div');
+  node.className = 'fx-stage redeem';
+  const n = Math.max(2, g.pieces);
+  node.innerHTML = `<div class="fx-ring tier-gift"></div><div class="fx-card assemble" style="--n:${n}">${Array.from({ length: n }, (_, i) => `<div class="fx-slice" style="--i:${i}">${giftCard(g, { tilt: false })}</div>`).join('')}</div><div class="fx-caption">${esc(caption)}</div>`;
+  $('#fx').appendChild(node);
+  setTimeout(() => burst(node.querySelector('.fx-card'), 40, 'gift'), 760);
+  setTimeout(() => node.remove(), 2500);
+}
+
+// ---------- 登入及啟動 ----------
+function showGate(inner) {
+  document.body.classList.add('gated');
+  const g = $('#gate');
+  g.hidden = false;
+  g.innerHTML = `<div class="gate-wrap">
+    <section class="gate-art" aria-hidden="true">
+      <div class="brand light"><span class="logo"></span><span class="brand-name">課堂冒險局<small>Classroom Quest</small></span></div>
+      <div class="gate-fan">${['exempt', 'designate', 'up'].map((k, i) => `<div class="fan" style="--i:${i}">${gameCard(k, { tilt: false })}</div>`).join('')}<div class="fan" style="--i:3">${giftCard(SAMPLE_GIFT, { piece: 0, tilt: false })}</div></div>
+      <p class="gate-tag">抽人作答、站立挑戰、<br>收集技能卡及老師禮物。</p>
+    </section>
+    <section class="gate-form">${inner}</section></div>`;
+  g.querySelector('[autofocus]')?.focus();
+}
+function hideGate() {
+  document.body.classList.remove('gated');
+  const g = $('#gate');
+  g.hidden = true;
+  g.innerHTML = '';
+}
+
+function gateLogin(msg = '') {
+  showGate(`<form data-form="login" class="gate-card stack" novalidate>
+    <span class="kicker">${ic('lock')}老師登入</span><h1>歡迎回來</h1><p class="muted">用管理員發給你的帳戶登入。每位老師的班別及禮物各自獨立。</p>
+    <label class="field"><span>登入名稱</span><input name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required autofocus></label>
+    <label class="field"><span>密碼</span><input name="password" type="password" autocomplete="current-password" required></label>
+    <p class="form-err" role="alert"${msg ? '' : ' hidden'}>${esc(msg)}</p>
+    <button class="btn primary xl">${ic('send')}登入</button>
+    <p class="muted small">忘記密碼？請學校的管理員幫你重設。</p></form>`);
+}
+
+function gateFirstPassword(msg = '') {
+  showGate(`<form data-form="firstPassword" class="gate-card stack">
+    <span class="kicker">${ic('key')}第一次登入</span><h1>設定你的密碼</h1><p class="muted">你好，${esc(me.name)}。為咗安全，請先將臨時密碼改成只有你知道的密碼。</p>
+    <label class="field"><span>臨時密碼</span><input name="current" type="password" autocomplete="current-password" required autofocus></label>
+    <label class="field"><span>新密碼（最少 8 字）</span><input name="next" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label class="field"><span>再輸入新密碼</span><input name="confirm" type="password" autocomplete="new-password" minlength="8" required></label>
+    <p class="form-err" role="alert"${msg ? '' : ' hidden'}>${esc(msg)}</p>
+    <button class="btn primary xl">${ic('check')}儲存並進入</button>
+    <button type="button" class="btn ghost" data-act="gateLogout">${ic('logout')}用其他帳戶登入</button></form>`);
+}
+
+function gateMoved() {
+  const legacy = legacyBackup();
+  let n = 0;
+  try {
+    n = JSON.parse(legacy)?.classes?.length || 0;
+  } catch {}
+  showGate(`<div class="gate-card stack">
+    <span class="kicker">${ic('sparkle')}新版已推出</span><h1>課堂冒險局<br>已升級為老師登入版</h1>
+    <p class="muted">新版每位老師有自己的帳戶，資料儲存在伺服器，用任何電腦登入都見到；亦新增老師自訂禮物及碎片收集。</p>
+    <a class="btn primary xl" href="${NEW_HOME}">${ic('send')}前往新版</a>
+    ${n ? `<div class="legacy"><p><b>這部電腦有舊版資料（${n} 班）。</b>先下載備份，登入新版後到「設定 → 還原備份」匯入。</p><button class="btn secondary" data-act="legacyDownload">${ic('download')}下載舊資料備份</button></div>` : ''}</div>`);
+}
+
+function gateError(msg) {
+  showGate(`<div class="gate-card stack"><span class="kicker">${ic('cloudOff')}未能連線</span><h1>暫時連唔到伺服器</h1><p class="muted">${esc(msg)}</p><button class="btn primary xl" data-act="retryBoot">${ic('refresh')}再試一次</button></div>`);
+}
+
+function formError(form, msg) {
+  const el = form.querySelector('.form-err');
+  el.textContent = msg;
+  el.hidden = !msg;
+  form.classList.remove('shake');
+  void form.offsetWidth;
+  if (msg) form.classList.add('shake');
+}
+
+async function doLogin(form, fd) {
+  const username = String(fd.get('username') || '').trim();
+  const password = String(fd.get('password') || '');
+  if (!username || !password) return formError(form, '請輸入登入名稱及密碼');
+  const btn = form.querySelector('button.primary');
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/login', { username, password });
+    await enter(r.user);
+  } catch (e) {
+    formError(form, e.message);
+    btn.disabled = false;
+  }
+}
+
+async function doFirstPassword(form, fd) {
+  if (fd.get('next') !== fd.get('confirm')) return formError(form, '兩次輸入的新密碼不一樣');
+  try {
+    const r = await api('POST', '/api/password', { current: fd.get('current'), next: fd.get('next') });
+    await enter(r.user);
+    toast('密碼已設定，歡迎使用');
+  } catch (e) {
+    formError(form, e.message);
+  }
+}
+
+function onConflict(next, version) {
+  state = next;
+  undo = [];
+  clearUndo(me.id);
+  ui.modal = null;
+  render();
+  toast('另一部裝置更新咗資料，已載入最新版本', true);
+}
+
+async function enter(user) {
+  if (me && me.id !== user.id) return location.reload();
+  me = user;
+  if (me.mustChange) return gateFirstPassword();
+  if (!sync) {
+    let r;
+    try {
+      r = await loadRemote();
+    } catch (e) {
+      return gateError(e.message);
+    }
+    state = r.state;
+    undo = loadUndo(me.id);
+    sync = createSync({ uid: me.id, version: r.version, onConflict, onStatus: (st) => {
+      syncStatus = st;
+      renderSync();
+      if (st === 'auth') gateLogin('登入已過期，請重新登入。未儲存的改動會在登入後自動上載。');
+    } });
+  } else sync.flushNow();
+  hideGate();
+  render();
+}
+
+async function boot() {
+  try {
+    const r = await api('GET', '/api/me');
+    await enter(r.user);
+  } catch (e) {
+    if (e.status === 401) return gateLogin();
+    if (e.status === -1 || e.status === 405 || e.status === 404) return gateMoved();
+    gateError(e.message);
+  }
+}
+
+document.addEventListener('visibilitychange', async () => {
+  if (document.visibilityState !== 'visible' || !sync || sync.dirty || ui.modal || ui.rolling || document.body.classList.contains('gated')) return;
+  try {
+    const r = await loadRemote();
+    if (r.version !== sync.base && !sync.dirty) {
+      state = r.state;
+      sync.setBase(r.version);
+      undo = [];
+      render();
+      toast('已載入另一部裝置的最新資料');
+    }
+  } catch {}
+});
+
+window.addEventListener('beforeunload', (ev) => {
+  if (sync?.dirty) {
+    sync.flushNow();
+    ev.preventDefault();
+    ev.returnValue = '';
+  }
+});
+
 const params = new URLSearchParams(location.search);
 if (params.has('test')) {
   window.__cq = {
     get state() { return state; },
+    get synced() { return !sync?.dirty; },
     setRng(values) { let i = 0; rng = () => values[i++ % values.length]; },
   };
 }
 
-render();
+boot();

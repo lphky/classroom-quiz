@@ -1,7 +1,8 @@
 import {test,expect} from '@playwright/test';
+import { login, synced } from './helpers.js';
 test('搜尋與狀態篩選、參與數據、調低卡與專注投影',async({page},info)=>{
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.goto('/?test');
+  await login(page);
   await page.getByRole('button',{name:'一鍵體驗 · 12 人測試班'}).click();
   await page.getByRole('button',{name:'開始上堂'}).click();
   await page.getByLabel('搜尋學生').fill('陳星晴');

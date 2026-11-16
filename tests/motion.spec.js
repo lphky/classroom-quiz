@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { login, synced } from './helpers.js';
 test('卡牌動畫、按鈕無 emoji', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/?test');
+  await login(page);
   await page.getByRole('button', { name: '一鍵體驗 · 12 人測試班' }).click();
   await page.getByRole('button', { name: '開始上堂' }).click();
   const labels = await page.locator('button').allInnerTexts();
