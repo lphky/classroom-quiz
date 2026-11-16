@@ -58,7 +58,7 @@ function gameCard(k, { cls = '', count = null, tilt = true } = {}) {
       <p class="gc-text">${esc(it.desc)}</p>
       <footer class="gc-foot"><span>CLASSROOM QUEST</span><span>No.${it.no}</span></footer>
     </div>
-    <span class="gc-shine"></span>${count != null ? `<span class="gc-count">×${count}</span>` : ''}
+    <span class="gc-shine"></span>${count ? `<span class="gc-count">×${count}</span>` : ''}
   </article>`;
 }
 
@@ -250,7 +250,7 @@ function viewLive(c) {
             const label = { seated: '坐低', standing: '站立', absent: '缺席' }[st];
             return `<button class="tile ${st}" data-status="${st}" data-search="${esc(s.no + ' ' + s.name)}" data-act="studentSheet" data-id="${s.id}">
               ${avatar(s)}<span class="tile-body"><span class="nm">${esc(s.name)}</span><span class="no">#${esc(s.no)}${state.settings.showOdds && chance[s.id] != null ? ` · ${pct(chance[s.id])}` : ''}</span></span>
-              <span class="score">${s.score}分</span><span class="badge st">${label}</span><span class="chips">${itemDots(s)}</span></button>`;
+              <span class="score">${s.score}分</span><span class="tile-meta"><span class="badge st">${label}</span><span class="chips">${itemDots(s)}</span></span></button>`;
           }).join('')}
         </div>
       </section>
@@ -464,7 +464,7 @@ async function rollAnimation(finalId, pool) {
         void el.offsetWidth;
         el.classList.add('tick');
       }
-      await sleep(40 + i * i * 1.5);
+      await sleep(36 + i * i * 1.05);
     }
   }
   ui.rolling = false;
