@@ -19,7 +19,7 @@ test('完整一堂：點名、舉手抽卡、抽人、免答卡、罰站、復�
   await page.evaluate(() => window.__cq.setRng([0]));
   await page.click('text=有人舉手');
   await page.click('.modal .tile:has-text("陳大文")');
-  await page.click('text=✔ 答對');
+  await page.getByRole('button',{name:'答對',exact:true}).click();
   await expect(page.locator('.card-flip')).toContainText('免答卡');
   await page.click('.modal >> text=好');
   await expect(page.locator('.tile:has-text("陳大文")')).toContainText('2分');
@@ -35,7 +35,7 @@ test('完整一堂：點名、舉手抽卡、抽人、免答卡、罰站、復�
   await page.click('text=有人舉手');
   await expect(page.locator('.modal .prio')).toBeVisible();
   await page.click('.modal .tile:has-text("李小明")');
-  await page.click('text=✔ 答對');
+  await page.getByRole('button',{name:'答對',exact:true}).click();
   await expect(page.locator('.modal')).toContainText('坐返低');
   await page.click('.modal >> text=好');
   await expect(page.locator('.tile:has-text("李小明")')).toHaveClass(/seated/);

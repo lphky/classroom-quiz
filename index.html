@@ -3,24 +3,39 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>課堂冒險局 · Classroom Playbook</title>
+  <meta name="theme-color" content="#f5f6fa">
+  <title>課堂冒險局</title>
   <meta name="description" content="課堂答問管理：抽人、罰站、道具卡及計分">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎲</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%234f46e5'/><path d='M10 9h9a4 4 0 0 1 0 8h-6v6' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="brand">課堂冒險局</div>
-    <nav class="tabs" id="tabs"></nav>
-    <div class="top-right">
-      <button class="btn ghost" data-act="fullscreen">⛶ 全螢幕</button><button class="btn ghost" data-act="focusMode">專注投影</button><select id="classSelect" aria-label="揀班"></select>
-      <button id="undoBtn" class="btn ghost" title="復原上一步">↶ 復原</button>
+  <div class="shell">
+    <aside class="side" id="side">
+      <div class="brand"><span class="logo" aria-hidden="true"></span><span class="brand-name">課堂冒險局<small>Classroom Quest</small></span></div>
+      <nav class="nav" id="tabs" aria-label="主選單"></nav>
+      <div class="side-foot" id="sideFoot"></div>
+    </aside>
+    <div class="main">
+      <header class="top">
+        <div class="top-title" id="topTitle"></div>
+        <div class="top-actions">
+          <label class="select-wrap"><span class="sr-only">揀班</span><select id="classSelect" aria-label="揀班"></select></label>
+          <button class="btn icon-btn desk-only" data-act="fullscreen" aria-label="全螢幕" title="全螢幕" id="fsBtn"></button>
+          <button class="btn secondary desk-only" data-act="focusMode" id="focusBtn">專注投影</button>
+          <button id="undoBtn" class="btn secondary" title="復原上一步"></button>
+        </div>
+      </header>
+      <main id="app"></main>
     </div>
-  </header>
+  </div>
   <button id="exitFocus" class="btn primary" data-act="focusMode">退出專注模式</button>
-  <main id="app"></main>
   <div id="modal" class="modal-wrap" hidden></div>
-  <div id="toast" class="toast" hidden></div>
+  <div id="fx" class="fx" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" hidden></div>
   <script type="module" src="js/app.mjs"></script>
 </body>
 </html>

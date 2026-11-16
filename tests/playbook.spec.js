@@ -19,7 +19,7 @@ test('搜尋與狀態篩選、參與數據、調低卡與專注投影',async({pa
   await expect(page.locator('#liveRoster .tile:visible')).toHaveCount(1);
   await page.getByRole('button',{name:'有人舉手'}).click();
   await page.locator('.modal .tile').filter({hasText:'陳星晴'}).click();
-  await page.getByRole('button',{name:'✔ 答對',exact:true}).click();
+  await page.getByRole('button',{name:'答對',exact:true}).click();
   await page.getByRole('button',{name:'好',exact:true}).click();
   await expect(page.locator('.pulse strong').nth(0)).toHaveText('100%');
   await expect(page.locator('.pulse strong').nth(1)).toHaveText('1');
