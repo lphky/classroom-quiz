@@ -26,8 +26,10 @@ const now = () => new Date().toISOString();
 const emptyItems = () => Object.fromEntries(ITEM_KEYS.map((k) => [k, 0]));
 
 export function createState() {
-  return { version: 1, settings: clone(DEFAULT_SETTINGS), classes: [], activeClassId: null, session: null, sessions: [], logs: [] };
+  return { version: 2, settings: clone(DEFAULT_SETTINGS), classes: [], gifts: [], activeClassId: null, session: null, sessions: [], logs: [] };
 }
+
+export const MAX_PIECES = 4;
 
 export function normalizeState(raw) {
   const base = createState();
@@ -36,7 +38,12 @@ export function normalizeState(raw) {
   s.settings = { ...clone(DEFAULT_SETTINGS), ...(raw.settings || {}) };
   s.settings.score = { ...DEFAULT_SETTINGS.score, ...(raw.settings?.score || {}) };
   s.settings.itemOdds = { ...DEFAULT_SETTINGS.itemOdds, ...(raw.settings?.itemOdds || {}) };
-  for (const c of s.classes) for (const st of c.students) st.items = { ...emptyItems(), ...(st.items || {}) };
+  s.gifts = Array.isArray(raw.gifts) ? raw.gifts.filter((g) => g && g.id && g.name).map((g) => ({ odds: 10, stock: null, ...g, pieces: clampPieces(g.pieces) })) : [];
+  for (const c of s.classes)
+    for (const st of c.students) {
+      st.items = { ...emptyItems(), ...(st.items || {}) };
+      st.frags = st.frags && typeof st.frags === 'object' ? st.frags : {};
+    }
   return s;
 }
 
@@ -115,6 +122,7 @@ export function addStudents(state, classId, rosterText) {
       name: r.name,
       weight: s.settings.baseWeight,
       items: emptyItems(),
+      frags: {},
       score: 0,
     });
   }
@@ -352,6 +360,102 @@ export function resolveDraw(state, correct) {
   return s;
 }
 
+const clampPieces = (n) => Math.min(MAX_PIECES, Math.max(1, Math.round(+n) || 1));
+
+export function getGift(state, id) {
+  return state.gifts.find((g) => g.id === id) || null;
+}
+
+export const giftLabel = (g, piece) => (g.pieces > 1 && piece != null ? `${g.name} ${piece + 1}/${g.pieces}` : g.name);
+
+function cleanGift(input) {
+  const name = String(input.name ?? '').trim().slice(0, 24);
+  if (!name) fail('請輸入禮物名稱');
+  const odds = Math.max(0, +input.odds || 0);
+  const stockRaw = input.stock;
+  const stock = stockRaw === '' || stockRaw == null ? null : Math.max(0, Math.round(+stockRaw) || 0);
+  return { name, pieces: clampPieces(input.pieces), odds, stock, note: String(input.note ?? '').trim().slice(0, 60) };
+}
+
+export function addGift(state, input) {
+  const s = clone(state);
+  const g = cleanGift(input);
+  if (s.gifts.some((x) => x.name === g.name)) fail('已經有同名禮物');
+  s.gifts.push({ id: uid(), ...g, createdAt: now() });
+  return s;
+}
+
+export function updateGift(state, id, input) {
+  const s = clone(state);
+  const g = getGift(s, id) || fail('找不到禮物');
+  const next = cleanGift({ ...g, ...input });
+  if (s.gifts.some((x) => x.id !== id && x.name === next.name)) fail('已經有同名禮物');
+  if (next.pieces !== g.pieces && s.classes.some((c) => c.students.some((st) => (st.frags[id] || []).some((n) => n > 0))))
+    fail('已經有同學收集緊呢份禮物，唔可以改碎片數目');
+  Object.assign(g, next);
+  return s;
+}
+
+export function removeGift(state, id) {
+  const s = clone(state);
+  getGift(s, id) || fail('找不到禮物');
+  s.gifts = s.gifts.filter((g) => g.id !== id);
+  for (const c of s.classes) for (const st of c.students) delete st.frags[id];
+  return s;
+}
+
+export function fragCounts(st, g) {
+  const arr = st.frags?.[g.id] || [];
+  return Array.from({ length: g.pieces }, (_, i) => arr[i] || 0);
+}
+
+export const canRedeem = (st, g) => fragCounts(st, g).every((n) => n > 0) && g.stock !== 0;
+
+export function giftOddsTotal(state) {
+  return ITEM_KEYS.reduce((n, k) => n + Math.max(0, +state.settings.itemOdds[k] || 0), 0) + state.gifts.filter((g) => g.stock !== 0).reduce((n, g) => n + g.odds, 0);
+}
+
+export function rewardPool(state) {
+  return [
+    ...ITEM_KEYS.map((k) => ({ kind: 'item', k, w: Math.max(0, +state.settings.itemOdds[k] || 0) })),
+    ...state.gifts.filter((g) => g.stock !== 0 && g.odds > 0).map((g) => ({ kind: 'gift', id: g.id, w: g.odds })),
+  ];
+}
+
+export function rollReward(state, rng = Math.random) {
+  const pick = pickWeighted(rewardPool(state), rng, 'w');
+  if (!pick) return null;
+  if (pick.kind === 'item') return { kind: 'item', k: pick.k };
+  const g = getGift(state, pick.id);
+  return { kind: 'gift', id: g.id, piece: Math.min(g.pieces - 1, Math.floor(rng() * g.pieces)) };
+}
+
+export function redeemGift(state, studentId, giftId) {
+  const s = clone(state);
+  const st = getStudent(s, studentId) || fail('找不到學生');
+  const g = getGift(s, giftId) || fail('找不到禮物');
+  if (g.stock === 0) fail(`${g.name} 已經換晒`);
+  const counts = fragCounts(st, g);
+  if (!counts.every((n) => n > 0)) fail(`${st.name} 未集齊 ${g.name}`);
+  st.frags[g.id] = counts.map((n) => n - 1);
+  if (st.frags[g.id].every((n) => n === 0)) delete st.frags[g.id];
+  if (g.stock != null) g.stock--;
+  log(s, { type: 'redeem', studentId, giftId: g.id, giftName: g.name });
+  return s;
+}
+
+export function adjustFrag(state, studentId, giftId, piece, delta) {
+  const s = clone(state);
+  const st = getStudent(s, studentId) || fail('找不到學生');
+  const g = getGift(s, giftId) || fail('找不到禮物');
+  const counts = fragCounts(st, g);
+  counts[piece] = Math.max(0, (counts[piece] || 0) + delta);
+  st.frags[g.id] = counts;
+  if (counts.every((n) => n === 0)) delete st.frags[g.id];
+  log(s, { type: 'adjust-frag', studentId, giftId, giftName: g.name, piece, pieces: g.pieces, delta });
+  return s;
+}
+
 export function rollItem(odds, rng = Math.random) {
   const list = ITEM_KEYS.map((k) => ({ k, w: Math.max(0, +odds[k] || 0) }));
   return pickWeighted(list, rng, 'w')?.k ?? null;
@@ -367,20 +471,30 @@ export function volunteer(state, studentId, correct, rng = Math.random) {
   let points = 0;
   let item = null;
   let bagFull = false;
+  let gift = null;
   if (correct) {
     if (wasStanding) {
       points = s.settings.score.standing;
       delete ses.standing[studentId];
     } else {
       points = s.settings.score.volunteer;
-      if (bagTotal(st) < s.settings.bagCap) {
-        item = rollItem(s.settings.itemOdds, rng);
-        if (item) st.items[item]++;
-      } else bagFull = true;
+      const reward = rollReward(s, rng);
+      if (reward?.kind === 'item') {
+        if (bagTotal(st) < s.settings.bagCap) {
+          item = reward.k;
+          st.items[item]++;
+        } else bagFull = true;
+      } else if (reward?.kind === 'gift') {
+        const g = getGift(s, reward.id);
+        const counts = fragCounts(st, g);
+        counts[reward.piece]++;
+        st.frags[g.id] = counts;
+        gift = { giftId: g.id, giftName: g.name, piece: reward.piece, pieces: g.pieces };
+      }
     }
   }
   st.score += points;
-  log(s, { type: 'answer', mode: wasStanding ? 'standing' : 'volunteer', studentId, correct: !!correct, points, item, bagFull, satDown: wasStanding && !!correct });
+  log(s, { type: 'answer', mode: wasStanding ? 'standing' : 'volunteer', studentId, correct: !!correct, points, item, bagFull, ...(gift || {}), satDown: wasStanding && !!correct });
   rememberAnswer(ses, studentId);
   return s;
 }
@@ -417,7 +531,7 @@ export function classStats(state, classId) {
   const rows = new Map(
     c.students.map((st) => [
       st.id,
-      { id: st.id, no: st.no, name: st.name, score: st.score, weight: st.weight, items: { ...st.items }, answered: 0, correct: 0, volunteer: 0, volunteerCorrect: 0, drawn: 0, drawnCorrect: 0, stood: 0, itemsGot: 0, itemsUsed: 0 },
+      { id: st.id, no: st.no, name: st.name, score: st.score, weight: st.weight, items: { ...st.items }, frags: st.frags || {}, giftsGot: 0, redeemed: 0, answered: 0, correct: 0, volunteer: 0, volunteerCorrect: 0, drawn: 0, drawnCorrect: 0, stood: 0, itemsGot: 0, itemsUsed: 0 },
     ]),
   );
   for (const e of state.logs) {
@@ -436,7 +550,9 @@ export function classStats(state, classId) {
         else r.stood++;
       }
       if (e.item) r.itemsGot++;
+      if (e.giftId) r.giftsGot++;
     } else if (e.type === 'use-item') r.itemsUsed++;
+    else if (e.type === 'redeem') r.redeemed++;
   }
   return [...rows.values()];
 }
@@ -451,8 +567,8 @@ export function toCSV(rows) {
 }
 
 export function statsCSV(state, classId) {
-  const head = ['座號', '姓名', '總分', '答問次數', '答對', '主動舉手', '主動答對', '被抽/被指定', '被抽答對', '罰站次數', '得到道具', '用咗道具', '抽中權重', ...ITEM_KEYS.map((k) => ITEMS[k].name)];
-  const body = classStats(state, classId).map((r) => [r.no, r.name, r.score, r.answered, r.correct, r.volunteer, r.volunteerCorrect, r.drawn, r.drawnCorrect, r.stood, r.itemsGot, r.itemsUsed, r.weight, ...ITEM_KEYS.map((k) => r.items[k])]);
+  const head = ['座號', '姓名', '總分', '答問次數', '答對', '主動舉手', '主動答對', '被抽/被指定', '被抽答對', '罰站次數', '得到道具', '用咗道具', '抽中權重', ...ITEM_KEYS.map((k) => ITEMS[k].name), '得到禮物碎片', '已換禮物'];
+  const body = classStats(state, classId).map((r) => [r.no, r.name, r.score, r.answered, r.correct, r.volunteer, r.volunteerCorrect, r.drawn, r.drawnCorrect, r.stood, r.itemsGot, r.itemsUsed, r.weight, ...ITEM_KEYS.map((k) => r.items[k]), r.giftsGot, r.redeemed]);
   return toCSV([head, ...body]);
 }
 
@@ -470,6 +586,7 @@ export function describeLog(e) {
       if (e.satDown) t += '，坐返低';
       if (!e.correct && (e.mode === 'drawn' || e.mode === 'designated')) t += '，罰站';
       if (e.item) t += `，抽到${ITEMS[e.item].name}`;
+      if (e.giftId) t += `，抽到禮物「${e.pieces > 1 ? `${e.giftName} ${e.piece + 1}/${e.pieces}` : e.giftName}」`;
       if (e.bagFull) t += '（背包已滿，冇抽卡）';
       return t;
     }
@@ -479,6 +596,8 @@ export function describeLog(e) {
       if (e.item === 'down') return `${e.name} 用調低卡（權重 ${e.before}→${e.after}）`;
       return `${e.name} 對 ${e.targetName} 用調高卡（權重 ${e.before}→${e.after}）`;
     case 'adjust': return `老師調整 ${e.name}`;
+    case 'redeem': return `${e.name} 集齊並換領「${e.giftName}」`;
+    case 'adjust-frag': return `老師${e.delta > 0 ? '加' : '減'} ${e.name} 的「${e.pieces > 1 ? `${e.giftName} ${e.piece + 1}/${e.pieces}` : e.giftName}」`;
     case 'manual-stand': return `老師將 ${e.name} 設為${e.standing ? '站立' : '坐低'}`;
     default: return e.type;
   }

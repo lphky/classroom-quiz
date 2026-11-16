@@ -178,3 +178,78 @@ test('設定驗證', () => {
   assert.throws(() => L.updateSettings(s, { minWeight: 300, maxWeight: 100 }), /最低/);
   assert.throws(() => L.updateSettings(s, { itemOdds: { exempt: 0, designate: 0, down: 0, up: 0 } }), /全部/);
 });
+
+test('老師自訂禮物：碎片數 1 至 4、驗證及同名', () => {
+  let s = L.addGift(L.createState(), { name: '珍珠奶茶', pieces: 2, odds: 10 });
+  assert.equal(s.gifts[0].pieces, 2);
+  assert.equal(s.gifts[0].stock, null);
+  assert.equal(L.addGift(s, { name: '大獎', pieces: 9 }).gifts[1].pieces, 4);
+  assert.equal(L.addGift(s, { name: '小獎', pieces: 0 }).gifts[1].pieces, 1);
+  assert.throws(() => L.addGift(s, { name: '珍珠奶茶', pieces: 1 }), /同名/);
+  assert.throws(() => L.addGift(s, { name: '  ' }), /名稱/);
+});
+
+test('主動答對可抽到禮物碎片，集齊先可以換，換完扣存量', () => {
+  let { s, ids } = setup(2);
+  s = L.addGift(s, { name: '珍珠奶茶', pieces: 2, odds: 100, stock: 1 });
+  s = L.updateSettings(s, { itemOdds: { exempt: 0, designate: 0, down: 0, up: 1 } });
+  const g = s.gifts[0];
+  // 總權重 101：rng 0.5 → 禮物；第二次 rng 0 → 第 1 片
+  s = L.volunteer(s, ids[0], true, seq(0.5, 0));
+  let e = s.logs.at(-1);
+  assert.equal(e.giftId, g.id);
+  assert.equal(e.piece, 0);
+  assert.match(L.describeLog(e), /珍珠奶茶 1\/2/);
+  assert.equal(L.canRedeem(L.getStudent(s, ids[0]), g), false);
+  assert.throws(() => L.redeemGift(s, ids[0], g.id), /未集齊/);
+  s = L.volunteer(s, ids[0], true, seq(0.5, 0));
+  assert.deepEqual(L.fragCounts(L.getStudent(s, ids[0]), g), [2, 0]);
+  s = L.volunteer(s, ids[0], true, seq(0.5, 0.99));
+  assert.deepEqual(L.fragCounts(L.getStudent(s, ids[0]), g), [2, 1]);
+  assert.equal(L.canRedeem(L.getStudent(s, ids[0]), L.getGift(s, g.id)), true);
+  s = L.redeemGift(s, ids[0], g.id);
+  assert.deepEqual(L.fragCounts(L.getStudent(s, ids[0]), g), [1, 0]);
+  assert.equal(L.getGift(s, g.id).stock, 0);
+  assert.equal(s.logs.at(-1).type, 'redeem');
+  // 存量 0：唔會再抽到
+  s = L.volunteer(s, ids[1], true, seq(0.5, 0));
+  assert.equal(s.logs.at(-1).giftId, undefined);
+  assert.equal(s.logs.at(-1).item, 'up');
+  const row = L.classStats(s, s.activeClassId).find((r) => r.id === ids[0]);
+  assert.equal(row.giftsGot, 3);
+  assert.equal(row.redeemed, 1);
+  assert.match(L.statsCSV(s, s.activeClassId), /已換禮物/);
+});
+
+test('禮物碎片唔佔背包；背包滿抽中道具卡就冇卡', () => {
+  let { s, ids } = setup(1);
+  s = L.addGift(s, { name: '貼紙', pieces: 1, odds: 100 });
+  s = L.updateSettings(s, { bagCap: 0, itemOdds: { exempt: 100, designate: 0, down: 0, up: 0 } });
+  s = L.volunteer(s, ids[0], true, seq(0.75, 0));
+  assert.deepEqual(L.fragCounts(L.getStudent(s, ids[0]), s.gifts[0]), [1]);
+  s = L.volunteer(s, ids[0], true, seq(0.1));
+  assert.equal(s.logs.at(-1).bagFull, true);
+});
+
+test('改碎片數目、刪除禮物、老師手動加減碎片', () => {
+  let { s, ids } = setup(1);
+  s = L.addGift(s, { name: '優先揀位', pieces: 4, odds: 5 });
+  const id = s.gifts[0].id;
+  s = L.updateGift(s, id, { pieces: 3 });
+  assert.equal(L.getGift(s, id).pieces, 3);
+  s = L.adjustFrag(s, ids[0], id, 2, 1);
+  assert.deepEqual(L.fragCounts(L.getStudent(s, ids[0]), L.getGift(s, id)), [0, 0, 1]);
+  assert.throws(() => L.updateGift(s, id, { pieces: 2 }), /唔可以改碎片數目/);
+  s = L.updateGift(s, id, { name: '優先揀座位', odds: 8 });
+  assert.equal(L.getGift(s, id).name, '優先揀座位');
+  s = L.removeGift(s, id);
+  assert.equal(s.gifts.length, 0);
+  assert.deepEqual(L.getStudent(s, ids[0]).frags, {});
+});
+
+test('舊資料（無禮物欄位）可以正常載入', () => {
+  const old = { version: 1, classes: [{ id: 'c', name: 'A', students: [{ id: 'x', no: '1', name: '甲', weight: 100, items: { exempt: 1 }, score: 0 }] }] };
+  const s = L.normalizeState(old);
+  assert.deepEqual(s.gifts, []);
+  assert.deepEqual(s.classes[0].students[0].frags, {});
+});
